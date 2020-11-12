@@ -9,4 +9,8 @@ how to run the project, tested on pop-os 20.04 (Ubuntu based):
 
 <br/>
 
-add your name and email to Cargo.toml's authors -field.
+Add your name and email to Cargo.toml's authors -field. <br/>
+
+
+The example shows a ferris on the lcd screen. <br/>
+
