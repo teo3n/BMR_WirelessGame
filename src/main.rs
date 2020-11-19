@@ -13,8 +13,13 @@ use embedded_graphics::primitive_style;
 use embedded_graphics::primitives::Rectangle;
 use gd32vf103xx_hal::pac;
 use gd32vf103xx_hal::prelude::*;
-// use longan_nano::{lcd, lcd_pins};
+
+use gd32vf103xx_hal::rcu::RcuExt;
+use gd32vf103xx_hal::delay::McycleDelay;
+use embedded_hal::blocking::delay::DelayMs;
+
 pub mod lcd;
+pub mod led;
 use riscv_rt::entry;
 
 const FERRIS: &[u8] = include_bytes!("ferris.raw");
@@ -34,6 +39,7 @@ fn main() -> ! {
 
     let gpioa = dp.GPIOA.split(&mut rcu);
     let gpiob = dp.GPIOB.split(&mut rcu);
+    let gpioc = dp.GPIOC.split(&mut rcu);
 
     let lcd_pins = lcd_pins!(gpioa, gpiob);
     let mut lcd = lcd::configure(dp.SPI0, lcd_pins, &mut afio, &mut rcu);
@@ -51,5 +57,19 @@ fn main() -> ! {
         .draw(&mut lcd)
         .unwrap();
 
-    loop {}
+    // configure leds
+    let (mut red, mut green, mut blue) = led::rgb(gpioc.pc13, gpioa.pa1, gpioa.pa2);
+    let leds: [&mut dyn led::Led; 3] = [&mut red, &mut green, &mut blue];
+    let mut delay = McycleDelay::new(&rcu.clocks);
+
+    let mut i = 0;
+    loop
+    {
+        let inext = (i + 1) % leds.len();
+        leds[i].off();
+        leds[inext].on();
+        delay.delay_ms(500);
+
+        i = inext;
+    }
 }
