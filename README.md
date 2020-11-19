@@ -7,7 +7,7 @@ how to run the project, tested on pop-os 20.04:
 	- note: requires sudo
 4. the terminal should now read ```File downloaded successfully``` and ```dfu-util: Error during download get_status.``` This is correct, power-cycle the device (or press reset) to execute the program.
 
-<br/> The example shows a ferris on the lcd screen. <br/>
+<br/> The example shows a ferris on the lcd screen ands blinks the on-board rgb led (cycles through the colors individually)<br/>
 
 Add your name and email to Cargo.toml's authors -field. <br/>
 
