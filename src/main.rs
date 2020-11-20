@@ -67,6 +67,7 @@ fn main() -> ! {
     );
 
     let mut delay = McycleDelay::new(&rcu.clocks);
+    delay.delay_ms(100);
 
     let i2c_0 = periph.I2C0;
 
@@ -79,14 +80,15 @@ fn main() -> ! {
         &mut afio,
         hal::i2c::Mode::standard(100.khz()),
         &mut rcu,
-        1000,
-        2,
-        1000,
-        1000
+        100000,
+        1,
+        100000,
+        100000
     );
 
     // i2c_handle.write(0x52, &[0xF0, 0x55, 0xFB, 0x00]).unwrap();
-    i2c_handle.write(0x52, &[0x40 as u8, 0x00 as u8]).unwrap();
+    
+    let mut write_res = i2c_handle.write(0x52, &[0x40, 0x00]);
 
     // TODO: somehow sends the address as 8bit instead of 7bit
 
@@ -94,22 +96,48 @@ fn main() -> ! {
     let mut i: u32 = 0;
     let mut f_val: u8 = 0;
 
+    let mut read_ok = 0;
+    let mut write_ok = 0;
+    let mut init_write = 0;
+
+    match write_res
+    {
+        Ok(x) => init_write = 1,
+        _ => init_write = 0,
+    }
+
+
     loop
     {
-        let mut print_buf = ArrayString::<[_; 12]>::new();
-        write!(&mut print_buf, "{}: {}", i, f_val).expect("failed to create buffer");
+        let mut print_buf = ArrayString::<[_; 24]>::new();
+
+        write!(&mut print_buf, "{}: iw: {}, r: {}, w: {}", i, init_write, read_ok, write_ok).expect("failed to create buffer");
         // write!(&mut print_buf, "{}: {} {} {} {}", i, read_buf[0], read_buf[1], read_buf[2], read_buf[3]).expect("failed to create buffer");
 
-        Text::new(&print_buf, Point::new(40, 35))
+
+        Text::new(&print_buf, Point::new(10, 35))
             .into_styled(style)
             .draw(&mut lcd).unwrap();
 
-        i2c_handle.write(0x52, &[0x00 as u8]).unwrap();
 
         let mut read_buf: [u8; 6] = [0; 6];
-        i2c_handle.read(0x52, &mut read_buf).unwrap();
+        let read_res = i2c_handle.read(0x52, &mut read_buf);
         f_val = read_buf[0];
 
+        write_res = i2c_handle.write(0x52, &[0x00 as u8]);
+
+
+        match read_res
+        {
+            Ok(x) => read_ok = 1,
+            _ => read_ok = 0,
+        }
+        
+        match write_res
+        {
+            Ok(x) => write_ok = 1,
+            _ => write_ok = 0,
+        }
 
         i += 1;
         delay.delay_ms(100);
