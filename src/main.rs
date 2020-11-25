@@ -65,23 +65,17 @@ fn main() -> ! {
         998
     );
 
-    // TODO: submit bugreport on incorrect master read ACK
-
-    // i2c_handle.write(0x52, &[0xF0, 0x55, 0xFB, 0x00]);
-    let shit = i2c_handle.write(0x52, &[0x40, 0x00]);
+    i2c_handle.write(0x52, &[0x40, 0x00]).unwrap();
 
     delay.delay_ms(10);
-
-    // let shit = i2c_handle.write(0x52, &[0x00]);
-
 
     loop
     {
         let mut read_buf: [u8; 6] = [0; 6];
-        let read_shit = i2c_handle.read(0x52, &mut read_buf);
+        i2c_handle.read(0x52, &mut read_buf).unwrap();
 
         delay.delay_us(100);
-        let write_white = i2c_handle.write(0x52, &[0x00]);
+        i2c_handle.write(0x52, &[0x00]).unwrap();
 
         delay.delay_ms(100);
     }
