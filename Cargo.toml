@@ -8,7 +8,8 @@ edition = "2018"
 
 [dependencies]
 embedded-hal = "0.2.4"
-gd32vf103xx-hal = "0.4.0"
+# gd32vf103xx-hal = "0.4.0"
+gd32vf103xx-hal = { path = "gd32vf103xx-hal/" }
 nb = "0.1.2"
 riscv = "0.6.0"
 

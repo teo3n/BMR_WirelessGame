@@ -17,11 +17,12 @@ use embedded_graphics::fonts::{Font6x8, Text};
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::{primitive_style, text_style};
 use gd32vf103xx_hal::pac;
-use gd32vf103xx_hal::pac::I2C1;
+use gd32vf103xx_hal::pac::I2C0;
 // use gd32vf103xx_hal::spi::{Spi, MODE_0};
 use gd32vf103xx_hal::i2c::{BlockingI2c, Mode};
 use gd32vf103xx_hal::prelude::*;
 
+use gd32vf103xx_hal::gpio::{Alternate, OpenDrain};
 use gd32vf103xx_hal::gpio::gpiob::{ PB8, PB9 };
 
 use gd32vf103xx_hal::rcu::RcuExt;
@@ -30,6 +31,7 @@ use embedded_hal::blocking::delay::DelayMs;
 
 use riscv_rt::entry;
 pub mod nunchuk;
+
 
 #[entry]
 fn main() -> ! {
@@ -75,7 +77,7 @@ fn main() -> ! {
 
     loop
     {
-        let mut read_buf: [u8; 2] = [0; 2];
+        let mut read_buf: [u8; 6] = [0; 6];
         let read_shit = i2c_handle.read(0x52, &mut read_buf);
 
         delay.delay_us(100);
