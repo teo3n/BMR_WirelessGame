@@ -65,17 +65,17 @@ fn main() -> ! {
         998
     );
 
-    i2c_handle.write(0x52, &[0x40, 0x00]).unwrap();
+    let write_res = i2c_handle.write(0x52, &[0x40, 0x00]);
 
     delay.delay_ms(10);
 
     loop
     {
         let mut read_buf: [u8; 6] = [0; 6];
-        i2c_handle.read(0x52, &mut read_buf).unwrap();
+        let read_res = i2c_handle.read(0x52, &mut read_buf);
 
         delay.delay_us(100);
-        i2c_handle.write(0x52, &[0x00]).unwrap();
+        let write_res = i2c_handle.write(0x52, &[0x00]);
 
         delay.delay_ms(100);
     }
