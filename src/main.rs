@@ -29,6 +29,7 @@ use gd32vf103xx_hal::rcu::RcuExt;
 use gd32vf103xx_hal::delay::McycleDelay;
 use embedded_hal::blocking::delay::DelayMs;
 
+pub mod lcd;
 use riscv_rt::entry;
 pub mod nunchuk;
 
@@ -44,38 +45,62 @@ fn main() -> ! {
         .sysclk(108.mhz())
         .freeze();
 
-    let mut afio = periph.AFIO.constrain(&mut rcu);
+    let gpioa = periph.GPIOA.split(&mut rcu);
     let gpiob = periph.GPIOB.split(&mut rcu);
-    let i2c_0 = periph.I2C0;
-    let mut delay = McycleDelay::new(&rcu.clocks);
-    delay.delay_ms(2);
 
-    let scl = gpiob.pb8.into_alternate_open_drain();
-    let sda = gpiob.pb9.into_alternate_open_drain();
-    
-    let mut i2c_handle = BlockingI2c::i2c0 (
-        i2c_0,
-        (scl, sda),
-        &mut afio,
-        Mode::standard(100.khz()),
-        &mut rcu,
-        998,
-        1,
-        998,
-        998
+    let mut afio = periph.AFIO.constrain(&mut rcu);
+    let mut delay = McycleDelay::new(&rcu.clocks);
+
+    let lcd_pins = lcd_pins!(gpioa, gpiob);
+    let mut lcd = lcd::configure(periph.SPI0, lcd_pins, &mut afio, &mut rcu);
+    let (width, height) = (lcd.size().width as i32, lcd.size().height as i32);
+
+    // clear the screen
+    Rectangle::new(Point::new(0, 0), Point::new(width - 1, height - 1))
+        .into_styled(primitive_style!(fill_color = Rgb565::BLACK))
+        .draw(&mut lcd)
+        .unwrap();
+
+    let style = text_style!(
+        font = Font6x8,
+        text_color = Rgb565::BLACK,
+        background_color = Rgb565::GREEN
     );
 
-    i2c_handle.write(0x52, &[0x40, 0x00]).unwrap();
+    delay.delay_ms(2);
+
+    let i2c0 = periph.I2C0;
+    let scl = gpiob.pb8.into_alternate_open_drain();
+    let sda = gpiob.pb9.into_alternate_open_drain();
+    let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
     delay.delay_ms(10);
 
     loop
     {
-        let mut read_buf: [u8; 6] = [0; 6];
-        i2c_handle.read(0x52, &mut read_buf).unwrap();
+        let input = nchuck.get_input();
 
-        delay.delay_us(100);
-        i2c_handle.write(0x52, &[0x00]).unwrap();
+        // print out the joystick values
+        let mut display_buffer_joy = ArrayString::<[_; 26]>::new();
+        write!(&mut display_buffer_joy, "joy_x: {}: joy_y: {}  ", input.joy_x, input.joy_y).expect("failed to create buffer");
+        Text::new(&display_buffer_joy, Point::new(10, 10))
+            .into_styled(style)
+            .draw(&mut lcd).unwrap();
+
+        // print out the button states
+        let mut display_buffer_btn = ArrayString::<[_; 26]>::new();
+        write!(&mut display_buffer_btn, "btn_z: {}: btn_c: {}  ", input.btn_z, input.btn_c).expect("failed to create buffer");
+        Text::new(&display_buffer_btn, Point::new(10, 30))
+            .into_styled(style)
+            .draw(&mut lcd).unwrap();
+
+        // print out the accelerometer values
+        let mut display_buffer_accel = ArrayString::<[_; 26]>::new();
+        write!(&mut display_buffer_accel, "az: {}: ay: {} az: {}  ", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
+        Text::new(&display_buffer_accel, Point::new(10, 50))
+            .into_styled(style)
+            .draw(&mut lcd).unwrap();
+
 
         delay.delay_ms(100);
     }
