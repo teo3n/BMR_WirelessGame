@@ -78,7 +78,7 @@ fn main() -> ! {
 
     loop
     {
-        let input = nchuck.get_input();
+        let input: nunchuk::ControllerInput = nchuck.get_input();
 
         // print out the joystick values
         let mut display_buffer_joy = ArrayString::<[_; 26]>::new();
