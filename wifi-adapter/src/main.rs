@@ -9,6 +9,7 @@ use esp8266_hal::target::Peripherals;
 //use esp8266_hal::rtccntl::CrystalFrequency;
 //use core::str;
 mod uart;
+mod wifi;
 
 
 #[entry]
@@ -24,6 +25,9 @@ fn main() -> ! {
     timer1.delay_ms(100);
 
     uart::init();
+    wifi::init();
+
+    wifi::connect("", "");
 
     let mut i = -5;
 
