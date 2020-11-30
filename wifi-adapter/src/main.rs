@@ -1,9 +1,13 @@
 #![no_std]
 #![no_main]
 
+extern "C" {
+    pub fn ets_delay_us(time: u32) -> u8;
+}
+
 use panic_halt as _;
-use esp8266_hal::prelude::*;
-use esp8266_hal::target::Peripherals;
+//use esp8266_hal::prelude::*;
+//use esp8266_hal::target::Peripherals;
 //use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
 //use esp8266_hal::gpio::{Gpio16, Output, PushPull};
 //use esp8266_hal::rtccntl::CrystalFrequency;
@@ -11,29 +15,39 @@ use esp8266_hal::target::Peripherals;
 mod uart;
 mod wifi;
 
+
 pub fn ets_printf() -> bool  {
     true
 }
 
-#[entry]
-//#[no_mangle]
-//#[link(name="user_init")]
-fn main() -> ! {    
-    let dp = Peripherals::take().unwrap();
+/*
+#[no_mangle]
+#[link(name="user_init")]
+unsafe extern "C" fn user_init() -> u8 { return 0; }
+*/
+#[no_mangle]
+#[link(name="user_pre_init")]
+unsafe extern "C" fn user_pre_init() -> u8 { return 0; }
+
+//#[entry]
+#[no_mangle]
+#[link(name="user_init")]
+fn user_init() -> ! {    
+    //let dp = Peripherals::take().unwrap();
     //dp.RTCCNTL.rtc_control().set_crystal_frequency(CrystalFrequency::Crystal40MHz);
 
-    let pins = dp.GPIO.split();
-    let mut led = pins.gpio16.into_push_pull_output();
-    let (mut timer1, _) = dp.TIMER.timers();
+    //let pins = dp.GPIO.split();
+    //let mut led = pins.gpio16.into_push_pull_output();
+    //let (mut timer1, _) = dp.TIMER.timers();
     
-    let mut _serial = dp.UART0.serial(pins.gpio1.into_uart(), pins.gpio3.into_uart());
-    timer1.delay_ms(100);
+    //let mut _serial = dp.UART0.serial(pins.gpio1.into_uart(), pins.gpio3.into_uart());
+    //timer1.delay_ms(100);
 
     uart::init();
     wifi::init();
 
     uart::writestring("Connecting Wifi\r\n");
-    wifi::connect("", "");
+    //wifi::connect("", "");
 
     let mut i = -5;
 
@@ -42,8 +56,9 @@ fn main() -> ! {
 
     while !connected {
         uart::writestring("Check connection\r\n");
-        connected = wifi::is_connected();
-        timer1.delay_ms(500);
+        //connected = wifi::is_connected();
+        //timer1.delay_ms(500);
+        unsafe { ets_delay_us(500000); };
     }
     let ip = wifi::get_ip();
 
@@ -58,14 +73,14 @@ fn main() -> ! {
     uart::writestring("\r\n");
 
     loop {
-        
+        /*
         timer1.delay_ms(100);
         led.toggle().unwrap();
         timer1.delay_ms(100);
         led.toggle().unwrap();
         timer1.delay_ms(1000);
         led.toggle().unwrap();
-
+        */
 
         uart::writestring("Loop..");
         uart::writenum(i);

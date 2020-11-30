@@ -44,14 +44,15 @@ pub struct station_config {
     pub bssid_set: u8,
     pub bssid: [u8; 6usize],
 }
+#[no_mangle]
+#[link(name="tkip")]
+unsafe extern "C" fn tkip() -> u8 { return 0; }
+
 
 #[no_mangle]
-#[link(name="user_init")]
-unsafe extern "C" fn user_init() -> u8 { return 0; }
+#[link(name="wep")]
+unsafe extern "C" fn wep() -> u8 { return 0; }
 
-#[no_mangle]
-#[link(name="user_pre_init")]
-unsafe extern "C" fn user_pre_init() -> u8 { return 0; }
 
 /*
 #[no_mangle]

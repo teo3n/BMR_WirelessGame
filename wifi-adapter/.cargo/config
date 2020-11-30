@@ -1,12 +1,12 @@
 [target.xtensa-esp8266-none-elf] # esp8266
 runner = "xtensa-lx106-elf-gdb -q -x openocd.gdb"
 rustflags = [
-  "-C", "link-arg=-Wl,-Tlink.x",
+  "-C", "link-arg=-Wl,-Tmemory.x",
   "-C", "link-arg=-nostartfiles", 
-  #"-C", "link-arg=-Wl,--no-check-sections", 
-  #"-C", "link-arg=-Wl,-static", 
+  "-C", "link-arg=-Wl,--no-check-sections", 
+  "-C", "link-arg=-Wl,-static", 
   #"-C", "link-arg=-u call_user_start",
-  "-C", "link-arg=-lc -lgcc -lhal -lpp -lphy -lnet80211 -llwip -lwpa -lwpa2 -lmain -lupgrade -lcrypto",
+  "-C", "link-arg=-lc -lgcc -lhal -lpp -lphy -lnet80211 -llwip -lwpa -lwpa2 -lmain -lcrypto",
 ]
 
 [build]
