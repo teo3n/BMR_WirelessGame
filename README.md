@@ -11,3 +11,13 @@ how to run the project, tested on pop-os 20.04:
 
 Add your name and email to Cargo.toml's authors -field. <br/>
 
+
+# IMPORTANT!
+
+requires rust nightly to run, due to inline assembly. <br/>
+
+```
+rustup target add riscv32imac-unknown-none-elf --toolchain nightly
+cargo +nightly build ...
+```
+
