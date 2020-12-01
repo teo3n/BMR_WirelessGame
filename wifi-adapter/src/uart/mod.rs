@@ -1,4 +1,6 @@
 
+#[allow(dead_code)]
+
 const UART_BASE : u32 = 0x60000000;
 const UART_FIFO : *mut u8 = UART_BASE as *mut u8;
 const UART_INT_CLR: *mut u16 = (UART_BASE + 0x10) as *mut u16;

@@ -19,7 +19,7 @@ PHDRS
 
 
 /*  Default entry point:  */
-ENTRY(user_init)
+ENTRY(call_user_start)
 EXTERN(_DebugExceptionVector)
 EXTERN(_DoubleExceptionVector)
 EXTERN(_KernelExceptionVector)
@@ -155,24 +155,10 @@ SECTIONS
   {
     _irom0_text_start = ABSOLUTE(.);
 
-    *libat.a:(.literal.* .text.*)
-    *libcrypto.a:(.literal.* .text.*)
-    *libespnow.a:(.literal.* .text.*)
-    *libjson.a:(.literal.* .text.*)
-    *liblwip.a:(.literal.* .text.*)
-    *libnet80211.a:(.literal.* .text.*)
-    *libsmartconfig.a:(.literal.* .text.*)
-    *libssl.a:(.literal.* .text.*)
-    *libupgrade.a:(.literal.* .text.*)
-    *libwpa.a:(.literal.* .text.*)
-    *libwpa2.a:(.literal.* .text.*)
-    *libwps.a:(.literal.* .text.*)
-
-    *libmbedtls.a:(.literal.* .text.*)
-
-    *libm.a:(.literal .text .literal.* .text.*)
+    *libmbedtls.a:(.literal .text .literal.* .text.*)
 
     *(.irom0.literal .irom.literal .irom.text.literal .irom0.text .irom.text)
+    *(*compiler_builtins..float* *compiler_builtins5float* *compiler_builtins..int..WideInt* ringbuf_*) /* Rust builtin trash */
     _irom0_text_end = ABSOLUTE(.);
   } >irom0_0_seg :irom0_0_phdr
 
@@ -549,6 +535,7 @@ PROVIDE ( timer_insert = 0x40002c64 );
 PROVIDE ( uartAttach = 0x4000383c );
 PROVIDE ( uart_baudrate_detect = 0x40003924 );
 PROVIDE ( uart_buff_switch = 0x400038a4 );
+PROVIDE ( uart_div_modify = 0x400039d8 );
 PROVIDE ( uart_rx_intr_handler = 0x40003bbc );
 PROVIDE ( uart_rx_one_char = 0x40003b8c );
 PROVIDE ( uart_rx_one_char_block = 0x40003b64 );
@@ -575,3 +562,4 @@ PROVIDE ( Td4s = 0x3fffd500);
 PROVIDE ( rcons = 0x3fffd0f0);
 PROVIDE ( UartDev = 0x3fffde10 );
 PROVIDE ( flashchip = 0x3fffc714);
+

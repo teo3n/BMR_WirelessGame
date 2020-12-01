@@ -1,36 +1,19 @@
 #![no_std]
 #![no_main]
 
-#[link(name = "c")]
-#[link(name = "gcc")]
-#[link(name = "pp")]
-#[link(name = "phy")]
-#[link(name = "net80211")]
-#[link(name = "lwip")]
-#[link(name = "wpa")]
-#[link(name = "wpa2")]
-#[link(name = "main")]
-#[link(name = "crypto")]
-
 #[allow(unused_mut)]
-
-use core::panic::PanicInfo;
-
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-
-    loop {}
-}
+#[allow(dead_code)]
 
 const GPIO_BASE : u32 = 0x60000300;
 const GPIO_OUT_W1TS_ADDRESS :*mut u32 = (GPIO_BASE+0x04) as *mut u32;
 const GPIO_OUT_W1TC_ADDRESS :*mut u32 = (GPIO_BASE+0x08) as *mut u32;
 
-
 extern "C" {
-    pub fn Uart_init() -> u8;
     pub fn ets_delay_us(time: u32) -> u8;
     pub fn gpio_output_set(set_mask:u32,clear_mask:u32,enable_mask:u32,disable_mask:u32);
+    pub fn system_timer_reinit();
+    pub fn system_soft_wdt_stop();
+    pub fn ets_wdt_disable();
 }
 
 const PAD_XPD_DCDC_CONF: *mut u32  =  (0x60000700 + 0x0A0) as *mut u32;
@@ -48,10 +31,10 @@ fn write_peri_reg(addr:*mut u32, val: u32) {
     unsafe { addr.write_volatile(val); };
 }
 fn clear_peri_reg_mask(reg:*mut u32, mask: u32) {
-    write_peri_reg((reg), read_peri_reg(reg)&(!(mask)))
+    write_peri_reg(reg, read_peri_reg(reg)&(!(mask)))
 }
 fn set_peri_reg_mask(reg:*mut u32, mask: u32)   {
-    write_peri_reg((reg), read_peri_reg(reg)|(mask))
+    write_peri_reg(reg, read_peri_reg(reg)|(mask))
 }
 
 const PERIPHS_IO_MUX_PULLUP:u32 =  0x00000080;
@@ -105,31 +88,45 @@ fn gpio_set(pin:u32, val:u32) -> bool {
     true
 }
 
-//use panic_halt as _;
-//use esp8266_hal::prelude::*;
-//use esp8266_hal::target::Peripherals;
-//use xtensa_lx::mutex::{CriticalSectionMutex, Mutex};
-//use esp8266_hal::gpio::{Gpio16, Output, PushPull};
-//use esp8266_hal::rtccntl::CrystalFrequency;
-//use core::str;
 mod uart;
-//mod wifi;
+mod wifi;
+
+use core::panic::PanicInfo;
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+
+    loop {
+        unsafe { ets_delay_us(500000); };
+        uart::writestring("PANIC\r\n");
+    }
+}
 
 
-
-/*
-#[no_mangle]
-#[link(name="user_init")]
-unsafe extern "C" fn user_init() -> u8 { return 0; }
-*/
 #[no_mangle]
 #[link(name="user_pre_init")]
 unsafe extern "C" fn user_pre_init() -> u8 { return 0; }
 
+
+#[no_mangle]
+#[link(name="user_rf_cal_sector_set")]
+unsafe extern "C" fn user_rf_cal_sector_set() -> u32
+{
+    return 512 - 5;
+}
+
+
 //#[entry]
 #[no_mangle]
 #[link(name="user_init")]
-fn user_init() -> ! {    
+fn user_init() -> ! {
+
+
+    unsafe {
+        system_timer_reinit();
+        system_soft_wdt_stop();
+        ets_wdt_disable();
+    };
 
     gpio16_output_conf();
     
@@ -140,7 +137,8 @@ fn user_init() -> ! {
     //wifi::init();
 
     uart::writestring("Connecting Wifi\r\n");
-    //wifi::connect("", "");
+    unsafe { ets_delay_us(500000); };
+    wifi::connect("SSID", "PWD");
 
     let mut i = -5;
 
@@ -149,7 +147,7 @@ fn user_init() -> ! {
 
     while !connected {
         uart::writestring("Check connection\r\n");
-        //connected = wifi::is_connected();
+        connected = wifi::is_connected();
         //timer1.delay_ms(500);
         unsafe { ets_delay_us(500000); };
         //unsafe { GPIO_OUT_W1TS_ADDRESS.write_volatile(1<<16); };
@@ -159,7 +157,7 @@ fn user_init() -> ! {
         gpio16_output_set(0);
 
     }
-    /*
+    
     let ip = wifi::get_ip();
 
     uart::writestring("Wifi connected!\r\n");
@@ -171,7 +169,7 @@ fn user_init() -> ! {
     uart::writestring(".");
     uart::writenum((ip & 0xff) as i32);
     uart::writestring("\r\n");
-*/
+
     loop {
         /*
         timer1.delay_ms(100);
@@ -185,7 +183,7 @@ fn user_init() -> ! {
         uart::writestring("Loop..");
         uart::writenum(i);
         uart::writestring("\r\n");
-
+        unsafe { ets_delay_us(100000); };
         i = i+1;
     }
 }
