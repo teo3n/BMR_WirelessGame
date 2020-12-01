@@ -1,1 +1,1 @@
-cargo build --release --all-features
+cargo +nightly build --release --all-features

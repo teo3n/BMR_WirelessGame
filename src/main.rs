@@ -3,6 +3,8 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
+#![feature(asm)]
+
 pub use gd32vf103xx_hal as hal;
 
 use panic_halt as _;
@@ -23,7 +25,7 @@ use gd32vf103xx_hal::i2c::{BlockingI2c, Mode};
 use gd32vf103xx_hal::prelude::*;
 
 use gd32vf103xx_hal::gpio::{Alternate, OpenDrain};
-use gd32vf103xx_hal::gpio::gpiob::{ PB8, PB9 };
+use gd32vf103xx_hal::gpio::gpiob::{ PB8, PB9, PB5 };
 
 use gd32vf103xx_hal::rcu::RcuExt;
 use gd32vf103xx_hal::delay::McycleDelay;
@@ -33,6 +35,7 @@ pub mod lcd;
 use riscv_rt::entry;
 pub mod nunchuk;
 pub mod ws2812;
+use ws2812::{ Ws2812, RGB };
 
 #[entry]
 fn main() -> ! {
@@ -44,6 +47,8 @@ fn main() -> ! {
         .ext_hf_clock(8.mhz())
         .sysclk(108.mhz())
         .freeze();
+
+    let clock_speed = rcu.clocks.sysclk().0;
 
     let gpioa = periph.GPIOA.split(&mut rcu);
     let gpiob = periph.GPIOB.split(&mut rcu);
@@ -70,11 +75,15 @@ fn main() -> ! {
     delay.delay_ms(2);
 
     let i2c0 = periph.I2C0;
-    let scl = gpiob.pb8.into_alternate_open_drain();
+    let scl = gpiob.pb8.into_alternate_open_drain();use embedded_hal::digital::v2::OutputPin;
     let sda = gpiob.pb9.into_alternate_open_drain();
     let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
     delay.delay_ms(10);
+
+
+    let mut wspin = gpiob.pb5.into_push_pull_output();
+    let mut ws2 = Ws2812::new(clock_speed, &mut wspin);
 
     loop
     {
@@ -101,7 +110,20 @@ fn main() -> ! {
             .into_styled(style)
             .draw(&mut lcd).unwrap();
 
+        for i in 0..2
+        {
+            if input.btn_z == 1
+            {
+                ws2.set_color(RGB { r: 255 as u8, g: 0 as u8, b: 0}, i);
+            }
+            else
+            {
+                ws2.set_color(RGB { r: 0 as u8, g: 255 as u8, b: 0}, i);
+            }
+        }
+        
 
-        delay.delay_ms(100);
+        ws2.write_leds();
+        delay.delay_ms(1);
     }
 }
