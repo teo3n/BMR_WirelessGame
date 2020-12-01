@@ -39,7 +39,7 @@ pub struct ControllerInput
 pub struct Nunchuk<'a>
 {
 	i2c_handle: BlockingI2c<I2C0, (PB8<Alternate<OpenDrain>>, PB9<Alternate<OpenDrain>>)>,
-	rcu: &'a mut Rcu
+	rcu: &'a mut Rcu,
 }
 
 // public methods

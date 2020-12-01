@@ -32,7 +32,7 @@ use embedded_hal::blocking::delay::DelayMs;
 pub mod lcd;
 use riscv_rt::entry;
 pub mod nunchuk;
-
+pub mod ws2812;
 
 #[entry]
 fn main() -> ! {
