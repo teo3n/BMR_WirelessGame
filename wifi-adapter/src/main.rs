@@ -22,76 +22,10 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
 
-
 const GPIO_BASE : u32 = 0x60000300;
 const GPIO_OUT_W1TS_ADDRESS :*mut u32 = (GPIO_BASE+0x04) as *mut u32;
 const GPIO_OUT_W1TC_ADDRESS :*mut u32 = (GPIO_BASE+0x08) as *mut u32;
-/*
-#define PERIPHS_IO_MUX                  0x60000800
-#define PERIPHS_IO_MUX_PULLUP           0x00000080
-#define PERIPHS_IO_MUX_FUNC             0x13
-#define PERIPHS_IO_MUX_FUNC_S           4
-#define READ_PERI_REG(addr) (*((volatile uint32_t *)ETS_UNCACHED_ADDR(addr)))
-#define WRITE_PERI_REG(addr, val) (*((volatile uint32_t *)ETS_UNCACHED_ADDR(addr))) = (uint32_t)(val)
-#define CLEAR_PERI_REG_MASK(reg, mask) WRITE_PERI_REG((reg), (READ_PERI_REG(reg)&(~(mask))))
-#define SET_PERI_REG_MASK(reg, mask)   WRITE_PERI_REG((reg), (READ_PERI_REG(reg)|(mask)))
-#define PIN_PULLUP_DIS(PIN_NAME)                 CLEAR_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLUP)
-#define PIN_PULLUP_EN(PIN_NAME)                  SET_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLUP)
 
-#define PERIPHS_IO_MUX_U0TXD_U          (PERIPHS_IO_MUX + 0x18)
-#define FUNC_U0TXD                      0
-
-#define PIN_FUNC_SELECT(PIN_NAME, FUNC)  do { \
-    WRITE_PERI_REG(PIN_NAME,   \
-                                READ_PERI_REG(PIN_NAME) \
-                                     &  (~(PERIPHS_IO_MUX_FUNC<<PERIPHS_IO_MUX_FUNC_S))  \
-                                     |( (((FUNC&0x00000004)<<2)|(FUNC&0x3))<<PERIPHS_IO_MUX_FUNC_S) );  \
-    } while (0)
-
-    PIN_PULLUP_DIS(PERIPHS_IO_MUX_U0TXD_U);
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_U0TXD_U, FUNC_U0TXD);
-
-
-PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO2_U, FUNC_GPIO2);
-GPIO_OUTPUT_SET(2, 0); //GPIO2 as output low
-
-#define GPIO_OUTPUT_SET(gpio_no, bit_value) \
-    gpio_output_set((bit_value)<<gpio_no, ((~(bit_value))&0x01)<<gpio_no, 1<<gpio_no,0)
-
-#define PERIPHS_GPIO_BASEADDR               0x60000300
-#define GPIO_OUT_W1TS_ADDRESS             0x04
-#define GPIO_OUT_W1TC_ADDRESS             0x08
-#define GPIO_REG_READ(reg)                         READ_PERI_REG(PERIPHS_GPIO_BASEADDR + reg)
-#define GPIO_REG_WRITE(reg, val)                 WRITE_PERI_REG(PERIPHS_GPIO_BASEADDR + reg, val)
-#define GPIO2_H         (GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1<<2))
-#define GPIO2_L         (GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1<<2))
-#define GPIO2(x)        ((x)?GPIO2_H:GPIO2_L)
-
-#define PAD_XPD_DCDC_CONF                       (0x60000700 + 0x0A0)
-#define RTC_GPIO_CONF                           (0x60000700 + 0x090)
-#define RTC_GPIO_ENABLE                         (0x60000700 + 0x074)
-#define RTC_GPIO_OUT                            (0x60000700 + 0x068)
-void ICACHE_FLASH_ATTR
-gpio16_output_conf(void)
-{
-    WRITE_PERI_REG(PAD_XPD_DCDC_CONF,
-                   (READ_PERI_REG(PAD_XPD_DCDC_CONF) & 0xffffffbc) | (uint32)0x1); 	// mux configuration for XPD_DCDC to output rtc_gpio0
-
-    WRITE_PERI_REG(RTC_GPIO_CONF,
-                   (READ_PERI_REG(RTC_GPIO_CONF) & (uint32)0xfffffffe) | (uint32)0x0);	//mux configuration for out enable
-
-    WRITE_PERI_REG(RTC_GPIO_ENABLE,
-                   (READ_PERI_REG(RTC_GPIO_ENABLE) & (uint32)0xfffffffe) | (uint32)0x1);	//out enable
-}
-
-void ICACHE_FLASH_ATTR
-gpio16_output_set(uint8 value)
-{
-    WRITE_PERI_REG(RTC_GPIO_OUT,
-                   (READ_PERI_REG(RTC_GPIO_OUT) & (uint32)0xfffffffe) | (uint32)(value & 1));
-}
-
-*/
 
 extern "C" {
     pub fn Uart_init() -> u8;
@@ -103,6 +37,44 @@ const PAD_XPD_DCDC_CONF: *mut u32  =  (0x60000700 + 0x0A0) as *mut u32;
 const RTC_GPIO_CONF: *mut u32      = (0x60000700 + 0x090) as *mut u32;
 const RTC_GPIO_ENABLE: *mut u32    = (0x60000700 + 0x074) as *mut u32;
 const RTC_GPIO_OUT: *mut u32       = (0x60000700 + 0x068) as *mut u32;
+
+
+fn read_peri_reg(addr:*mut u32) -> u32 {
+    unsafe {
+    return addr.read_volatile();
+    };
+}
+fn write_peri_reg(addr:*mut u32, val: u32) { 
+    unsafe { addr.write_volatile(val); };
+}
+fn clear_peri_reg_mask(reg:*mut u32, mask: u32) {
+    write_peri_reg((reg), read_peri_reg(reg)&(!(mask)))
+}
+fn set_peri_reg_mask(reg:*mut u32, mask: u32)   {
+    write_peri_reg((reg), read_peri_reg(reg)|(mask))
+}
+
+const PERIPHS_IO_MUX_PULLUP:u32 =  0x00000080;
+
+fn pin_pullup_dis(pin:*mut u32) {
+    clear_peri_reg_mask(pin, PERIPHS_IO_MUX_PULLUP)
+}  
+fn pin_pullup_en(pin:*mut u32) {
+    set_peri_reg_mask(pin, PERIPHS_IO_MUX_PULLUP);
+}
+const PERIPHS_IO_MUX:*mut u32 = 0x60000800 as *mut u32;
+const PERIPHS_IO_MUX_U0TXD_U:*mut u32 = (0x60000800 + 0x18) as *mut u32;
+const PERIPHS_IO_MUX_FUNC: u32 =  0x13;
+const PERIPHS_IO_MUX_FUNC_S: u32 = 4;
+const FUNC_U0TXD: u32 = 0;
+
+fn pin_func_select(pin:*mut u32, func: u32) {     
+    write_peri_reg(pin, 
+        read_peri_reg(pin) & 
+         (!(PERIPHS_IO_MUX_FUNC<<PERIPHS_IO_MUX_FUNC_S))
+         |( (((func&0x00000004)<<2)|(func&0x3))<<PERIPHS_IO_MUX_FUNC_S) );    
+}
+
 
 fn gpio16_output_conf() {
 
@@ -158,17 +130,12 @@ unsafe extern "C" fn user_pre_init() -> u8 { return 0; }
 #[no_mangle]
 #[link(name="user_init")]
 fn user_init() -> ! {    
-    //let dp = Peripherals::take().unwrap();
-    //dp.RTCCNTL.rtc_control().set_crystal_frequency(CrystalFrequency::Crystal40MHz);
-
-    //let pins = dp.GPIO.split();
-    //let mut led = pins.gpio16.into_push_pull_output();
-    //let (mut timer1, _) = dp.TIMER.timers();
-    
-    //let mut _serial = dp.UART0.serial(pins.gpio1.into_uart(), pins.gpio3.into_uart());
-    //timer1.delay_ms(100);
 
     gpio16_output_conf();
+    
+    // Conf UART
+    pin_pullup_dis(PERIPHS_IO_MUX_U0TXD_U);
+    pin_func_select(PERIPHS_IO_MUX_U0TXD_U, FUNC_U0TXD);
     //uart::init();
     //wifi::init();
 
