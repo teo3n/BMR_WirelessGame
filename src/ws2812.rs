@@ -180,8 +180,8 @@ impl<'a> Ws2812<'a>
             let mut counter: u32 = 0;
             asm!(
                 "1:",
-                "addi  {0}, {0}, 1",
-                "blt   {0}, {1}, 1b",
+                    "addi  {0}, {0}, 1",
+                    "blt   {0}, {1}, 1b",
 
                 inout(reg) counter,
                 in(reg) wait_for_cycles,
