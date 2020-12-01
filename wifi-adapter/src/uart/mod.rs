@@ -4,39 +4,7 @@ const UART_FIFO : *mut u8 = UART_BASE as *mut u8;
 const UART_INT_CLR: *mut u16 = (UART_BASE + 0x10) as *mut u16;
 const UART_CONF0: *mut u32 = (UART_BASE + 0x20) as *mut u32;
 const UART_CONF1: *mut u32 = (UART_BASE + 0x24) as *mut u32;
-/*
-#define PERIPHS_IO_MUX						0x60000800
-#define PERIPHS_IO_MUX_PULLUP           0x00000080
-#define PERIPHS_IO_MUX_FUNC             0x13
-#define PERIPHS_IO_MUX_FUNC_S           4
-#define READ_PERI_REG(addr) (*((volatile uint32_t *)ETS_UNCACHED_ADDR(addr)))
-#define WRITE_PERI_REG(addr, val) (*((volatile uint32_t *)ETS_UNCACHED_ADDR(addr))) = (uint32_t)(val)
-#define CLEAR_PERI_REG_MASK(reg, mask) WRITE_PERI_REG((reg), (READ_PERI_REG(reg)&(~(mask))))
-#define SET_PERI_REG_MASK(reg, mask)   WRITE_PERI_REG((reg), (READ_PERI_REG(reg)|(mask)))
-#define PIN_PULLUP_DIS(PIN_NAME)                 CLEAR_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLUP)
-#define PIN_PULLUP_EN(PIN_NAME)                  SET_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLUP)
 
-#define PERIPHS_IO_MUX_U0TXD_U          (PERIPHS_IO_MUX + 0x18)
-#define FUNC_U0TXD                      0
-
-#define PIN_FUNC_SELECT(PIN_NAME, FUNC)  do { \
-    WRITE_PERI_REG(PIN_NAME,   \
-                                READ_PERI_REG(PIN_NAME) \
-                                     &  (~(PERIPHS_IO_MUX_FUNC<<PERIPHS_IO_MUX_FUNC_S))  \
-                                     |( (((FUNC&0x00000004)<<2)|(FUNC&0x3))<<PERIPHS_IO_MUX_FUNC_S) );  \
-    } while (0)
-
-    PIN_PULLUP_DIS(PERIPHS_IO_MUX_U0TXD_U);
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_U0TXD_U, FUNC_U0TXD);
-
-
-PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO2_U, FUNC_GPIO2);
-GPIO_OUTPUT_SET(2, 0); //GPIO2 as output low
-
-#define GPIO_OUTPUT_SET(gpio_no, bit_value) \
-    gpio_output_set((bit_value)<<gpio_no, ((~(bit_value))&0x01)<<gpio_no, 1<<gpio_no,0)
-
-*/
 
 pub fn init() -> bool {
 
