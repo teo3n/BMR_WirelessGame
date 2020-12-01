@@ -10,6 +10,7 @@
  *      - should error checking be implemented?
  *      - move to macro -based, so multiple instances
  *          with different led counts and pins can exist
+ *      - write bit setting in assembly as well
  * 
  *  HOW TO USE:
  *      - initialize Ws2812 with
