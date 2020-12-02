@@ -10,6 +10,10 @@ static mut BOARD: [char; BOARD_SIZE] = ['X'; BOARD_SIZE];
 
 const DECELERATION: f32 = -0.1f32;
 
+const MAXIMUM_OBJECTS: usize = 10;
+const MAX_COLLISIONS_PER_OBJECT: usize = 5;
+const MAXIMUM_COLLISIONS: usize = MAXIMUM_OBJECTS * MAX_COLLISIONS_PER_OBJECT;
+
 fn clear_board() {
     for y in 1..(BOARD_WIDTH - 1) {
         for x in 1..(BOARD_WIDTH - 1) {
@@ -114,7 +118,6 @@ impl MovingObject {
         }
 
         if final_ {
-
             let x_vel;
             let y_vel;
             if self.velocity.x < 0f32 {
@@ -131,32 +134,43 @@ impl MovingObject {
         }
     }
 
-    fn get_collisions(self, others: Vec<MovingObject>, offset: usize, max_duration: f32) -> Vec<(usize, f32, usize)> {
+    fn get_collisions(self,
+                      others: [Option<MovingObject>; MAXIMUM_OBJECTS],
+                      offset: usize,
+                      max_duration: f32,) -> [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] {
         let new_loc = Vector {
             x: self.location.x + self.velocity.x,
             y: self.location.y + self.velocity.y,
         };
         // println!("{} {}", self.velocity.x, self.velocity.y);
 
-        let mut collisions: Vec<(usize, f32, usize)> = Vec::new();
+        let mut num_collisions: usize = 0;
+        let mut collisions: [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] = [None; MAX_COLLISIONS_PER_OBJECT];
 
         if new_loc.x < 0f32 && (self.location.x / self.velocity.x).abs() < max_duration {
-            collisions.push((127, (self.location.x / self.velocity.x).abs(), offset));
+            collisions[num_collisions] = Some((127, (self.location.x / self.velocity.x).abs(), offset));
+            num_collisions+=1;
         }
         if new_loc.x > BOARD_INSIDE as f32 &&
             ((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x).abs() < max_duration {
-            collisions.push((126, ((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x).abs(), offset));
+            collisions[num_collisions] = Some((126, ((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x).abs(), offset));
+            num_collisions+=1;
         }
         if new_loc.y < 0f32 && (self.location.y / self.velocity.y).abs() < max_duration {
-            collisions.push((125, (self.location.y / self.velocity.y).abs(), offset));
+            collisions[num_collisions] = Some((125, (self.location.y / self.velocity.y).abs(), offset));
+            num_collisions+=1;
         }
         if new_loc.y > BOARD_INSIDE as f32 &&
             ((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y).abs() < max_duration {
-            collisions.push((124, ((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y).abs(), offset));
+            collisions[num_collisions] = Some((124, ((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y).abs(), offset));
+            num_collisions+=1;
         }
 
-        for i in 0..others.len() {
-            let other = others[i];
+        for i in offset + 1..MAXIMUM_OBJECTS {
+            let other = match others[i] {
+                Some(o) => o,
+                None => continue
+            };
             if !self.moving() && !other.moving() {
                 continue;
             }
@@ -164,7 +178,8 @@ impl MovingObject {
                 self.location, self.velocity, other.location, other.velocity, 1f32,
             );
             if 0f32 < collision_time && collision_time < max_duration {
-                collisions.push((offset + 1 + i, collision_time, offset));
+                collisions[num_collisions] = Some((i, collision_time, offset));
+                num_collisions+=1;
             }
         }
         return collisions;
@@ -180,7 +195,6 @@ impl MovingObject {
 }
 
 fn main() -> io::Result<()> {
-    // let a = String::from("HEllo");
     clear_board();
     let file = File::open("starts.txt")?;
     let reader = BufReader::new(file);
@@ -205,13 +219,19 @@ fn main() -> io::Result<()> {
         tba_objects.push((wait_time, angle, symbol));
     }
 
-    let mut objects: Vec<MovingObject> = Vec::new();
+    let mut objects: [Option<MovingObject>; MAXIMUM_OBJECTS] = [None; MAXIMUM_OBJECTS];
+    let mut number_of_objects: usize = 0;
     let mut index = 0;
 
     while tba_objects[index].0 == 0 {
         let (_, angle, symbol) = tba_objects[index];
-        objects.push(MovingObject::new(Vector { x: angle.cos() * 5f32, y: -angle.sin() * 5f32 }, symbol));
+        objects[number_of_objects] = Some(
+            MovingObject::new(Vector {
+                x: angle.cos() * 5f32,
+                y: -angle.sin() * 5f32,
+            }, symbol));
         index += 1;
+        number_of_objects += 1;
     }
 
     loop {
@@ -219,34 +239,63 @@ fn main() -> io::Result<()> {
 
         let mut tick_so_far = 0f32;
         while tick_so_far < 1f32 {
-            let mut collision_velocities: Vec<Option<Vector>> = vec![None; objects.len()];
-            let mut all_collisions: Vec<(usize, f32, usize)> = Vec::new();
-            for i in 0..objects.len() {
-                let ob = objects[i];
-                let temp = ob.get_collisions(objects[(i + 1)..].to_vec(), i, 1f32 - tick_so_far);
-                all_collisions.extend(temp);
+            let mut collision_velocities: [Option<Vector>; MAXIMUM_OBJECTS] = [None; MAXIMUM_OBJECTS];
+            let mut all_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] = [None; MAXIMUM_COLLISIONS];
+            let mut total_collisions: usize = 0;
+            for i in 0..number_of_objects {
+                let ob = match objects[i] {
+                    Some(o) => o,
+                    None => panic!()
+                };
+                let temp = ob.get_collisions(objects, i, 1f32 - tick_so_far);
+                for i in 0..MAXIMUM_COLLISIONS {
+                    match temp[i] {
+                        Some(_) => (),
+                        None => break
+                    };
+                    all_collisions[total_collisions] = temp[i];
+                    total_collisions += 1;
+                }
             }
             let mut duration = 1f32 - tick_so_far;
-            let mut used_collisions: Vec<(usize, f32, usize)> = Vec::new();
 
-            if all_collisions.len() != 0 {
+            let mut num_used_collisions = 0;
+            let mut used_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] = [None; MAXIMUM_COLLISIONS];
+
+            if total_collisions!= 0 {
                 let mut first_collision = 1f32;
+
                 for collision in &all_collisions {
-                    let (_, time, _) = collision;
-                    first_collision = first_collision.min(*time);
+                    let time = match collision {
+                        Some(t) => t.1,
+                        None => break
+                    };
+                    first_collision = first_collision.min(time);
                 }
+
                 first_collision = (first_collision * 100f32).ceil() / 100f32;
                 duration = first_collision;
+
                 for collision in &all_collisions {
-                    let (_, time, _) = collision;
-                    if *time <= first_collision {
-                        used_collisions.push(*collision);
+                    let time = match collision {
+                        Some(t) => t.1,
+                        None => break
+                    };
+                    if time <= first_collision {
+                        used_collisions[num_used_collisions] = *collision;
+                        num_used_collisions += 1;
                     }
                 }
             }
             for collision in &used_collisions {
-                let (other_idx, _, first_idx) = *collision;
-                let mut first_collider = objects[first_idx];
+                let (other_idx, first_idx) = match collision {
+                    Some(o) => (o.0, o.2),
+                    None => break,
+                };
+                let mut first_collider = match objects[first_idx] {
+                    Some(o) => o,
+                    None => panic!()
+                };
 
                 if other_idx == 126 || other_idx == 127 {
                     collision_velocities[first_idx] = Some(Vector {
@@ -259,7 +308,10 @@ fn main() -> io::Result<()> {
                         y: -first_collider.velocity.y,
                     });
                 } else {
-                    let mut other_collider = objects[other_idx];
+                    let mut other_collider = match objects[other_idx] {
+                        Some(o) => o,
+                        None => panic!()
+                    };
                     if other_collider.moving() && first_collider.moving() {
                         let temp = first_collider.ratios;
                         first_collider.ratios = other_collider.ratios;
@@ -292,16 +344,29 @@ fn main() -> io::Result<()> {
                     }
                 }
             }
-            for i in 0..objects.len() {
-                objects[i].tick(duration, !(tick_so_far + duration < 1f32), collision_velocities[i]);
-                let (a, b) = objects[i].position();
-                // println!("This shit {} {}", a, b);
+            for i in 0..number_of_objects {
+                let mut temp = match objects[i] {
+                    Some(o) => o,
+                    None => continue
+                };
+                temp.tick(duration,
+                          !(tick_so_far + duration < 1f32),
+                          collision_velocities[i]);
+                objects[i] = Some(
+                    temp
+                );
             }
 
-            if all_collisions.len() != 0 {
-                for collision in used_collisions {
-                    let (other_idx, _, first_idx) = collision;
-                    let object = objects[first_idx];
+            if num_used_collisions != 0 {
+                for collision in &used_collisions {
+                    let (other_idx, first_idx) = match collision {
+                        Some(o) => (o.0, o.2),
+                        None => break,
+                    };
+                    let object = match objects[first_idx] {
+                        Some(o) => o,
+                        None => panic!()
+                    };
                     if other_idx == 127 {
                         unsafe {
                             BOARD[0 + (object.location.y + 1.5f32) as usize * BOARD_WIDTH] = object.symbol;
@@ -326,13 +391,20 @@ fn main() -> io::Result<()> {
         clear_board();
 
         while index < tba_objects.len() && tba_objects[index].0 == 0 {
-            let (_, angle, symbol ) = tba_objects[index];
-            objects.push(MovingObject::new(Vector { x: angle.cos() * 5f32, y: -angle.sin() * 5f32 }, symbol));
+            let (_, angle, symbol) = tba_objects[index];
+            objects[number_of_objects] = Some(
+                MovingObject::new(Vector { x: angle.cos() * 5f32, y: -angle.sin() * 5f32 }, symbol)
+            );
             index += 1;
+            number_of_objects += 1;
         }
 
         let mut moving: bool = false;
-        for object in &objects{
+        for i in 0..number_of_objects {
+            let object = match objects[i] {
+                Some(o) => o,
+                None => continue,
+            };
             unsafe {
                 let pos = object.position();
                 BOARD[pos.0 + pos.1 * BOARD_WIDTH] = object.symbol;
@@ -346,7 +418,6 @@ fn main() -> io::Result<()> {
         if index < tba_objects.len() {
             tba_objects[index].0 -= 1;
         }
-        println!("{}", objects.len());
     }
 
     Ok(())
