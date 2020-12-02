@@ -87,9 +87,7 @@ const OVERHEAD_NS: u32 = 30;
 
 pub struct Ws2812<'a, T, const N: usize>
 {
-    // data_pin: &'a mut gpio::Pxx<Output<PushPull>>,
     data_pin: &'a mut T,
-        // mut gpio::gpiob::PB5<Output<PushPull>>,
     data_buffer: [RGB; N],
     clock_speed: u32,
 }
@@ -163,8 +161,6 @@ where T: OutputPin
                 }
             }
         }
-
-        // self.reset();
     }
 
     // prepares the led strip for mroe data, holds reset
