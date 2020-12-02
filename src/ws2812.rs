@@ -8,20 +8,24 @@
  * 
  *  TODO: 
  *      - should error checking be implemented?
- *      - move to macro -based, so multiple instances
- *          with different led counts and pins can exist
- *      - write bit setting in assembly as well
+ *      - write bit setting and maybe all nops in assembly as well
  * 
  *  HOW TO USE:
  *      - initialize Ws2812 with
+ * 
  *          let mut wspin = gpiob.pb5.into_push_pull_output();
- *          let mut ws2 = Ws2812::new(clock_speed, &mut wspin);
- *      - currently the gpio -pin is hard coded and LED_COUNT are hard coded
+ *          let mut ws2 = Ws2812::<_, LED_COUNT>::new(clock_speed, &mut wspin);
+ * 
+ *        where LED_COUNT is a compile-time constant, and wspin is a pin 
+ *        implementing the OutputPin -trait (Output<PushPull>)
+ * 
  *      - to set an led at index call 
  *          ws2.set_color(RGB { r: 255, g: 0 as u8, b: 0}, index);
+ * 
  *      - to write changes to the leds call
  *          ws2.write_leds();
  */
+
 
 /*
  * how it works:
@@ -34,8 +38,8 @@
 
 pub use gd32vf103xx_hal as hal;
 use gd32vf103xx_hal::pac;
+use gd32vf103xx_hal::gpio;
 use gd32vf103xx_hal::gpio::{ Output, PushPull };
-use gd32vf103xx_hal::gpio; //::{ PB5 };
 use gd32vf103xx_hal::rcu::Rcu;
 use gd32vf103xx_hal::afio::Afio;
 use gd32vf103xx_hal::prelude::*;
@@ -74,8 +78,6 @@ impl RGB
     }
 }
 
-const LED_COUNT: usize = 2;
-
 // on average, one clock cycle in the delay_ns 
 // amounts to this many nanoseconds, at 108MHz
 const NS_WAIT_CLOCK_CYCLE: u32 = 37;
@@ -83,26 +85,27 @@ const NS_WAIT_CLOCK_CYCLE: u32 = 37;
 // at delay of 0ns this overhead still exists
 const OVERHEAD_NS: u32 = 30;
 
-pub struct Ws2812<'a>
+pub struct Ws2812<'a, T, const N: usize>
 {
     // data_pin: &'a mut gpio::Pxx<Output<PushPull>>,
-    data_pin: &'a mut gpio::gpiob::PB5<Output<PushPull>>,
-    data_buffer: [RGB; LED_COUNT],
+    data_pin: &'a mut T,
+        // mut gpio::gpiob::PB5<Output<PushPull>>,
+    data_buffer: [RGB; N],
     clock_speed: u32,
 }
 
 
 // public methods
-impl<'a> Ws2812<'a>
+impl<'a, T, const N: usize> Ws2812<'a, T, N>
+where T: OutputPin
 {
     /// takes in a push-pull output pin, which is used as the data pin for the leds
     pub fn new(
         clock_speed: u32,
-        // data_pin: &'a mut gpio::Pxx<Output<PushPull>>,
-        data_pin: &'a mut gpio::gpiob::PB5<Output<PushPull>>,
+        data_pin: &'a mut T,
     ) -> Self
     {
-        let buffer: [RGB; LED_COUNT] = [ RGB::zero(); LED_COUNT];
+        let buffer: [RGB; N] = [ RGB::zero(); N];
         // get the system clock speed
 
         let mut ws = Ws2812
@@ -112,7 +115,6 @@ impl<'a> Ws2812<'a>
             clock_speed,
         };
 
-        // ws.init();
         return ws;
     }
 
@@ -123,26 +125,34 @@ impl<'a> Ws2812<'a>
 
     pub fn write_leds(&mut self)
     {
-        for i in 0..LED_COUNT
+        for i in 0..self.data_buffer.len()
         {
             self.write_at(i as u32);
         }
 
         self.reset();
     }
+
+    pub fn get_led_count(&self) -> u32
+    {
+        return self.data_buffer.len() as u32;
+    }
 }
 
 
 // private methods
-impl<'a> Ws2812<'a>
+impl<'a, T, const N: usize> Ws2812<'a, T, N>
+where T: OutputPin
 {
     // writes the entire buffer to the led strip
     fn write_at(&mut self, write_index: u32)
     {
         let gbr_buffer: [u8; 3] = self.data_buffer[write_index as usize].get_as_buffer();
         
+        // loop over GRB
         for j in 0..3
         {
+            // loop over the bits in the byte
             for k in 0..8
             {
                 match (gbr_buffer[j] >> (k - 7)) & 0x01
@@ -195,9 +205,9 @@ impl<'a> Ws2812<'a>
     {
         match state
         {
-            State::High => self.data_pin.set_high().unwrap(),
-            State::Low => self.data_pin.set_low().unwrap(),
-        }
+            State::High => self.data_pin.set_high(),
+            State::Low => self.data_pin.set_low(),
+        };
 
         self.delay_ns(ns);
     }

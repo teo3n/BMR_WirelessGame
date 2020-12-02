@@ -4,6 +4,7 @@
 #![allow(unused_variables)]
 
 #![feature(asm)]
+#![feature(min_const_generics)]
 
 pub use gd32vf103xx_hal as hal;
 
@@ -24,7 +25,7 @@ use gd32vf103xx_hal::pac::I2C0;
 use gd32vf103xx_hal::i2c::{BlockingI2c, Mode};
 use gd32vf103xx_hal::prelude::*;
 
-use gd32vf103xx_hal::gpio::{Alternate, OpenDrain};
+use gd32vf103xx_hal::gpio::{ Alternate, OpenDrain, PushPull};
 use gd32vf103xx_hal::gpio::gpiob::{ PB8, PB9, PB5 };
 
 use gd32vf103xx_hal::rcu::RcuExt;
@@ -83,7 +84,7 @@ fn main() -> ! {
 
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
-    let mut ws2 = Ws2812::new(clock_speed, &mut wspin);
+    let mut ws2 = Ws2812::<_, 3>::new(clock_speed, &mut wspin);
 
     loop
     {
@@ -110,7 +111,7 @@ fn main() -> ! {
             .into_styled(style)
             .draw(&mut lcd).unwrap();
 
-        for i in 0..2
+        for i in 0..ws2.get_led_count()
         {
             if input.btn_z == 1
             {
