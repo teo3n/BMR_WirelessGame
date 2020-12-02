@@ -78,7 +78,7 @@ fn main() -> ! {
     let i2c0 = periph.I2C0;
     let scl = gpiob.pb8.into_alternate_open_drain();use embedded_hal::digital::v2::OutputPin;
     let sda = gpiob.pb9.into_alternate_open_drain();
-    let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
+    // let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
     delay.delay_ms(10);
 
@@ -88,39 +88,42 @@ fn main() -> ! {
 
     loop
     {
-        let input: nunchuk::ControllerInput = nchuck.get_input();
+        // let input: nunchuk::ControllerInput = nchuck.get_input();
 
-        // print out the joystick values
-        let mut display_buffer_joy = ArrayString::<[_; 26]>::new();
-        write!(&mut display_buffer_joy, "joy_x: {}: joy_y: {}  ", input.joy_x, input.joy_y).expect("failed to create buffer");
-        Text::new(&display_buffer_joy, Point::new(10, 10))
-            .into_styled(style)
-            .draw(&mut lcd).unwrap();
+        // // print out the joystick values
+        // let mut display_buffer_joy = ArrayString::<[_; 26]>::new();
+        // write!(&mut display_buffer_joy, "joy_x: {}: joy_y: {}  ", input.joy_x, input.joy_y).expect("failed to create buffer");
+        // Text::new(&display_buffer_joy, Point::new(10, 10))
+        //     .into_styled(style)
+        //     .draw(&mut lcd).unwrap();
 
-        // print out the button states
-        let mut display_buffer_btn = ArrayString::<[_; 26]>::new();
-        write!(&mut display_buffer_btn, "btn_z: {}: btn_c: {}  ", input.btn_z, input.btn_c).expect("failed to create buffer");
-        Text::new(&display_buffer_btn, Point::new(10, 30))
-            .into_styled(style)
-            .draw(&mut lcd).unwrap();
+        // // print out the button states
+        // let mut display_buffer_btn = ArrayString::<[_; 26]>::new();
+        // write!(&mut display_buffer_btn, "btn_z: {}: btn_c: {}  ", input.btn_z, input.btn_c).expect("failed to create buffer");
+        // Text::new(&display_buffer_btn, Point::new(10, 30))
+        //     .into_styled(style)
+        //     .draw(&mut lcd).unwrap();
 
-        // print out the accelerometer values
-        let mut display_buffer_accel = ArrayString::<[_; 26]>::new();
-        write!(&mut display_buffer_accel, "az: {}: ay: {} az: {}  ", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
-        Text::new(&display_buffer_accel, Point::new(10, 50))
-            .into_styled(style)
-            .draw(&mut lcd).unwrap();
+        // // print out the accelerometer values
+        // let mut display_buffer_accel = ArrayString::<[_; 26]>::new();
+        // write!(&mut display_buffer_accel, "az: {}: ay: {} az: {}  ", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
+        // Text::new(&display_buffer_accel, Point::new(10, 50))
+        //     .into_styled(style)
+        //     .draw(&mut lcd).unwrap();
 
-        for i in 0..ws2.get_led_count()
+        // for i in 0..ws2.get_led_count()
+        // {
+        //     if input.btn_z == 1
+        //     {
+        //         ws2.set_color(RGB { r: 255 as u8, g: 0 as u8, b: 0}, i);
+        //     }
+        //     else
+        //     {
+        //     }
+        // }
+        for i in 0..3
         {
-            if input.btn_z == 1
-            {
-                ws2.set_color(RGB { r: 255 as u8, g: 0 as u8, b: 0}, i);
-            }
-            else
-            {
-                ws2.set_color(RGB { r: 0 as u8, g: 255 as u8, b: 0}, i);
-            }
+            ws2.set_color(RGB { r: 0 as u8, g: 255 as u8, b: 0}, i);
         }
         
 
