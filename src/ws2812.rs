@@ -157,6 +157,9 @@ where T: OutputPin
                 {
                     0x00 => self.write_zero(),
                     0x01 => self.write_one(),
+
+                    // this branch should never be reached, but 
+                    // compiler nags if it isn't implemented
                     _ => (),
                 }
             }
