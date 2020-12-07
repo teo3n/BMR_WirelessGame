@@ -4,6 +4,28 @@
 #[allow(unused_mut)]
 #[allow(dead_code)]
 
+pub type ETSTimerFunc = unsafe extern "C" fn(timer_arg: *const u32);
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct os_timer_t {
+    pub timer_next: *mut os_timer_t,
+    pub timer_expire: u32,
+    pub timer_period: u32,
+    pub timer_func: ETSTimerFunc,
+    pub timer_arg: *const u32,
+}
+
+impl Default for os_timer_t {
+    fn default () -> os_timer_t {
+        os_timer_t{timer_next: 0 as *mut os_timer_t,
+                   timer_expire: 0,
+                   timer_period: 0,
+                   timer_func: update as ETSTimerFunc,
+                   timer_arg: 0 as * const u32
+                }
+    }
+}
+
 const GPIO_BASE : u32 = 0x60000300;
 const GPIO_OUT_W1TS_ADDRESS :*mut u32 = (GPIO_BASE+0x04) as *mut u32;
 const GPIO_OUT_W1TC_ADDRESS :*mut u32 = (GPIO_BASE+0x08) as *mut u32;
@@ -17,6 +39,16 @@ extern "C" {
     pub fn wifi_get_opmode() -> u8;
     pub fn wifi_get_phy_mode() -> u32;
     pub fn system_soft_wdt_feed();
+    /*
+    void ets_timer_arm_new(os_timer_t *ptimer, uint32_t time, bool repeat_flag, bool ms_flag);
+    void ets_timer_disarm(os_timer_t *ptimer);
+    void ets_timer_setfn(os_timer_t *ptimer, os_timer_func_t *pfunction, void *parg);
+    */
+    pub fn ets_timer_disarm(timer: *mut os_timer_t);
+    pub fn ets_timer_arm_new(timer: *mut os_timer_t, time: u32, repeat: u8, ms: u8);
+    pub fn ets_timer_setfn(timer: *mut os_timer_t, function: ETSTimerFunc, arg: *const u32);
+    pub fn ets_timer_arm(timer: *mut os_timer_t, time: u32, repeat: u8);
+    pub fn ets_timer_init();
 }
 
 const PAD_XPD_DCDC_CONF: *mut u32  =  (0x60000700 + 0x0A0) as *mut u32;
@@ -91,6 +123,9 @@ fn gpio_set(pin:u32, val:u32) -> bool {
     true
 }
 
+
+
+
 mod uart;
 mod wifi;
 
@@ -118,6 +153,21 @@ unsafe extern "C" fn user_rf_cal_sector_set() -> u32
     return 512 - 5;
 }
 
+#[no_mangle]
+#[link(name="update")]
+unsafe extern "C" fn update(timer_arg: *const u32) {
+    gpio16_output_set(1);
+    unsafe { ets_delay_us(1000); };    
+    gpio16_output_set(0);
+    uart::writestring("Timer Test\r\n");
+}
+
+static mut update_timer:os_timer_t = os_timer_t {timer_next: 0 as *mut os_timer_t,
+    timer_expire: 0,
+    timer_period: 0,
+    timer_func: update as ETSTimerFunc,
+    timer_arg: 0 as * const u32
+ };
 
 //#[entry]
 #[no_mangle]
@@ -127,8 +177,8 @@ fn user_init() {
 
     unsafe {
         system_timer_reinit();
-        system_soft_wdt_stop();
-        ets_wdt_disable();
+        //system_soft_wdt_stop();
+        //ets_wdt_disable();
     };
 
     gpio16_output_conf();
@@ -190,20 +240,17 @@ fn user_init() {
         connected = true;
 
     }
+
     
-    uart::writestring("Wifi connected!\r\n");
-    let ip = wifi::get_ip();
-
-    uart::writestring("IP: ");
-    uart::writenum((ip >> 24) as i32);
-    uart::writestring(".");
-    uart::writenum((ip >> 16 & 0xff) as i32);
-    uart::writestring(".");
-    uart::writenum((ip >> 8 & 0xff) as i32);
-    uart::writestring(".");
-    uart::writenum((ip & 0xff) as i32);
-    uart::writestring("\r\n");
-
+    unsafe {
+        //ets_timer_init();
+        let param:u32 = 0;
+        uart::writestring("Arming timer..\r\n");
+        ets_timer_disarm(& mut update_timer);
+        ets_timer_setfn(& mut update_timer, update, &param);
+        //ets_timer_arm(& mut update_timer, 1000, 1);
+        ets_timer_arm_new(& mut update_timer, 1000, 1, 1);
+    };
 /*
     loop {
 
