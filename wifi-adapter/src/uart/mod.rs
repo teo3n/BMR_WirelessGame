@@ -36,6 +36,13 @@ pub fn writestring(input: &str) -> bool {
     true
 }
 
+pub fn writechr(input: u8) -> bool {
+    unsafe {
+        UART_FIFO.write_volatile(input);
+    }
+    true
+}
+
 pub fn writenum(input: i32) -> bool {
 
     if input == 0 {

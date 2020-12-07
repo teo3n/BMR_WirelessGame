@@ -14,6 +14,9 @@ extern "C" {
     pub fn system_timer_reinit();
     pub fn system_soft_wdt_stop();
     pub fn ets_wdt_disable();
+    pub fn wifi_get_opmode() -> u8;
+    pub fn wifi_get_phy_mode() -> u32;
+    pub fn system_soft_wdt_feed();
 }
 
 const PAD_XPD_DCDC_CONF: *mut u32  =  (0x60000700 + 0x0A0) as *mut u32;
@@ -119,7 +122,7 @@ unsafe extern "C" fn user_rf_cal_sector_set() -> u32
 //#[entry]
 #[no_mangle]
 #[link(name="user_init")]
-fn user_init() -> ! {
+fn user_init() {
 
 
     unsafe {
@@ -138,16 +141,29 @@ fn user_init() -> ! {
 
     uart::writestring("Connecting Wifi\r\n");
     unsafe { ets_delay_us(500000); };
-    wifi::connect("SSID", "PWD");
-
+    let con_status = wifi::connect("BMR_wireless", "wire123456");
+    uart::writestring("Con status: ");
+    uart::writenum(con_status as i32);
+    uart::writestring("\r\n");
     let mut i = -5;
 
 
     let mut connected = false;
 
     while !connected {
-        uart::writestring("Check connection\r\n");
-        connected = wifi::is_connected();
+        unsafe { ets_delay_us(1000000); };
+        uart::writestring("Check connection..");
+        let status = wifi::is_connected();
+        if status == 5 {
+            connected = true;
+        }
+        uart::writenum(status as i32);
+        uart::writestring("..stationmode..");
+        unsafe { uart::writenum(wifi_get_opmode() as i32); };
+        uart::writestring("..phymode..");
+        unsafe { uart::writenum(wifi_get_phy_mode() as i32); };        
+
+        uart::writestring("\r\n");
         //timer1.delay_ms(500);
         unsafe { ets_delay_us(500000); };
         //unsafe { GPIO_OUT_W1TS_ADDRESS.write_volatile(1<<16); };
@@ -156,11 +172,29 @@ fn user_init() -> ! {
         //unsafe { GPIO_OUT_W1TC_ADDRESS.write_volatile(1<<16); };
         gpio16_output_set(0);
 
+
+        unsafe { system_soft_wdt_feed(); };
+
+        let ip = wifi::get_ip();
+
+        uart::writestring("IP: ");
+        uart::writenum((ip >> 24) as i32);
+        uart::writestring(".");
+        uart::writenum((ip >> 16 & 0xff) as i32);
+        uart::writestring(".");
+        uart::writenum((ip >> 8 & 0xff) as i32);
+        uart::writestring(".");
+        uart::writenum((ip & 0xff) as i32);
+        uart::writestring("\r\n");
+
+        connected = true;
+
     }
     
+    uart::writestring("Wifi connected!\r\n");
     let ip = wifi::get_ip();
 
-    uart::writestring("Wifi connected!\r\n");
+    uart::writestring("IP: ");
     uart::writenum((ip >> 24) as i32);
     uart::writestring(".");
     uart::writenum((ip >> 16 & 0xff) as i32);
@@ -170,15 +204,8 @@ fn user_init() -> ! {
     uart::writenum((ip & 0xff) as i32);
     uart::writestring("\r\n");
 
+/*
     loop {
-        /*
-        timer1.delay_ms(100);
-        led.toggle().unwrap();
-        timer1.delay_ms(100);
-        led.toggle().unwrap();
-        timer1.delay_ms(1000);
-        led.toggle().unwrap();
-        */
 
         uart::writestring("Loop..");
         uart::writenum(i);
@@ -186,4 +213,5 @@ fn user_init() -> ! {
         unsafe { ets_delay_us(100000); };
         i = i+1;
     }
+    */
 }
