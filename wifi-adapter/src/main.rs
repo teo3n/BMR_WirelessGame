@@ -160,6 +160,10 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
     unsafe { ets_delay_us(1000); };    
     gpio16_output_set(0);
     uart::writestring("Timer Test\r\n");
+    let mut byte: u8 = 0;
+    while uart::readchr(&mut byte) {
+        uart::writechr(byte);
+    }
 }
 
 static mut update_timer:os_timer_t = os_timer_t {timer_next: 0 as *mut os_timer_t,

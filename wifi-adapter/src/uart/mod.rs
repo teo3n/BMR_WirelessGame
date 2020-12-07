@@ -4,8 +4,10 @@
 const UART_BASE : u32 = 0x60000000;
 const UART_FIFO : *mut u8 = UART_BASE as *mut u8;
 const UART_INT_CLR: *mut u16 = (UART_BASE + 0x10) as *mut u16;
+const UART_STATUS: *mut u32 = (UART_BASE + 0x1C) as *mut u32;
 const UART_CONF0: *mut u32 = (UART_BASE + 0x20) as *mut u32;
 const UART_CONF1: *mut u32 = (UART_BASE + 0x24) as *mut u32;
+
 
 
 pub fn init() -> bool {
@@ -73,4 +75,14 @@ pub fn writenum(input: i32) -> bool {
         }
     }
     true
+}
+
+pub fn readchr(byte: &mut u8) -> bool {
+    unsafe {
+        if UART_STATUS.read_volatile() & 0xff == 0 {
+            return false;
+        }
+        *byte = UART_FIFO.read_volatile();
+    };
+    return true;
 }
