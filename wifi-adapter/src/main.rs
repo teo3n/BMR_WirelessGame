@@ -128,6 +128,7 @@ fn gpio_set(pin:u32, val:u32) -> bool {
 
 mod uart;
 mod wifi;
+mod server;
 
 use core::panic::PanicInfo;
 
@@ -166,7 +167,8 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
     }
 }
 
-static mut update_timer:os_timer_t = os_timer_t {timer_next: 0 as *mut os_timer_t,
+static mut update_timer:os_timer_t = os_timer_t {
+    timer_next: 0 as *mut os_timer_t,
     timer_expire: 0,
     timer_period: 0,
     timer_func: update as ETSTimerFunc,
@@ -255,6 +257,9 @@ fn user_init() {
         //ets_timer_arm(& mut update_timer, 1000, 1);
         ets_timer_arm_new(& mut update_timer, 1000, 1, 1);
     };
+
+    server::init();
+
 /*
     loop {
 
