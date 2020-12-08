@@ -34,9 +34,19 @@ use embedded_hal::blocking::delay::DelayMs;
 
 pub mod lcd;
 use riscv_rt::entry;
+
 pub mod nunchuk;
 pub mod ws2812;
+pub mod gameboard;
+pub mod colors;
+
+use gameboard::(gameboard);
 use ws2812::{ Ws2812, RGB };
+
+const PIXEL_TOTAL_AMOUNT = 256;
+const X_LIMIT = 5;
+const Y_LIMIT = 5;
+
 
 #[entry]
 fn main() -> ! {
@@ -84,8 +94,23 @@ fn main() -> ! {
 
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
-    let mut ws2 = Ws2812::<_, 3>::new(clock_speed, &mut wspin);
+    let mut ws2 = Ws2812::<_, PIXEL_TOTAL_AMOUNT>::new(clock_speed, &mut wspin);
+    let mut board = gameboard::new(X_LIMIT,Y_LIMIT,ws2).unwrap();
 
+    for x in 0..X_LIMIT
+    {
+        for y in 0..Y_LIMIT
+        {
+            if x % 2 == 0
+            {
+                board.set_color(x,y,colors::RED)
+            }
+            else
+            {
+                board.set_color(x,y,colors::GREEN)
+            }
+        }
+    }
     loop
     {
         // let input: nunchuk::ControllerInput = nchuck.get_input();
@@ -121,13 +146,14 @@ fn main() -> ! {
         //     {
         //     }
         // }
-        for i in 0..3
+        for x in 0..X_LIMIT
         {
-            ws2.set_color(RGB { r: 0 as u8, g: 255 as u8, b: 0}, i);
+            for y in 0..Y_LIMIT-1
+            {
+                board.swap(x,y,x,y+1);
+            }
         }
-        
-
-        ws2.write_leds();
-        delay.delay_ms(1);
+        board.update_matrix();
+        delay.delay_ms(500);
     }
 }
