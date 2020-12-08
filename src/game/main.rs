@@ -118,14 +118,14 @@ impl MovingObject {
             let x_vel;
             let y_vel;
             if self.velocity.x < 0f32 {
-                x_vel = 0f32.min(self.velocity.x - DECELERATION * self.ratios.x)
+                x_vel = min(0f32, self.velocity.x - DECELERATION * self.ratios.x)
             } else {
-                x_vel = 0f32.max(self.velocity.x + DECELERATION * self.ratios.x)
+                x_vel = max(0f32,self.velocity.x + DECELERATION * self.ratios.x)
             }
             if self.velocity.y < 0f32 {
-                y_vel = 0f32.min(self.velocity.y - DECELERATION * self.ratios.y)
+                y_vel = min(0f32, self.velocity.y - DECELERATION * self.ratios.y)
             } else {
-                y_vel = 0f32.max(self.velocity.y + DECELERATION * self.ratios.y)
+                y_vel = max(0f32, self.velocity.y + DECELERATION * self.ratios.y)
             }
             self.velocity = Vector { x: x_vel, y: y_vel };
         }
@@ -183,7 +183,7 @@ impl MovingObject {
     }
 
     fn position(self) -> (usize, usize) {
-        (self.location.x.round() as usize + 1, self.location.y.round() as usize + 1)
+        ((self.location.x + 1.5) as usize , (self.location.y + 1.5) as usize)
     }
 
     fn moving(self) -> bool {
@@ -221,6 +221,14 @@ fn abs(num: f32) -> f32 {
 
 fn pow2(num: f32) -> f32 {
     num * num
+}
+
+fn min(first: f32, second: f32) -> f32 {
+    if first < second {first} else {second}
+}
+
+fn max(first: f32, second: f32) -> f32 {
+    if first > second {first} else {second}
 }
 
 fn main() {
@@ -289,10 +297,10 @@ fn main() {
                         Some(t) => t.1,
                         None => break
                     };
-                    first_collision = first_collision.min(time);
+                    first_collision = min(first_collision,time);
                 }
 
-                first_collision = (first_collision * 100f32).ceil() / 100f32;
+                first_collision = (first_collision * 100f32 + 1f32) / 100f32;
                 duration = first_collision;
 
                 for collision in &all_collisions {
