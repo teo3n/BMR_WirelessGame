@@ -1,74 +1,83 @@
-pub mod ws2812;
-use ws2812::{ Ws2812, RGB };
+use crate::ws2812::{ Ws2812, RGB };
 
-pub const MAX_WIDHT: usize = 16;
+pub const MAX_WIDTH: usize = 16;
 pub const MAX_HEIGHT: usize = 16;
 
 #[derive(Clone, Copy)]
-pub struct gameboard<const WIDHT: usize, const HEIGHT : usize>
+pub struct Gameboard<const WIDTH: usize, const HEIGHT : usize>
 {
-    matrix: [[RGB;WIDHT];HEIGHT],
-    ws: &Ws2812,
+    matrix: [[RGB;WIDTH];HEIGHT],
+    ws: Ws2812,
 }
 
-impl<const WIDHT: usize, const HEIGHT : usize> gameboard<WIDHT,HEIGHT>{
+impl<const WIDTH: usize, const HEIGHT : usize> Gameboard<WIDTH,HEIGHT>{
 
-    //initialize new gameboard with given arguments
-    pub fn new(widht: usize, height: usize, ws: &Ws2812) -> Result<Self, E>
+    //initialize new Gameboard with given arguments
+    pub fn new(ws: Ws2812) -> Self
     {
-        if widht > MAX_WIDHT
+        if WIDTH >= MAX_WIDTH
         {
-            Err("Widht cannot be larger than MAX_WIDHT")
+            // Err("Widht cannot be larger than MAX_WIDTH")
+            Gameboard
+                {matrix: [[RGB::zero();MAX_WIDTH-1];MAX_HEIGHT],
+                ws: ws}
         } 
-        else if height > MAX_HEIGHT
+        else if HEIGHT >= MAX_HEIGHT
         {
-            Err("Height cannot be larger than MAX_HEIGHT")
+            // Err("Height cannot be larger than MAX_HEIGHT")
+            Gameboard
+                {matrix: [[RGB::zero();MAX_WIDTH-1];MAX_HEIGHT],
+                ws: ws}
         }
         else
         {
-            Ok(gameboard
-                {matrix: [[RGB::zero():widht];height],
+            Gameboard
+                {matrix: [[RGB::zero();WIDTH];HEIGHT],
                 ws: ws}
-            )
+            /*Ok(Gameboard
+                {matrix: [[RGB::zero();width];height],
+                ws: ws}
+            )*/
+        
         }
     }
 
     // swaps colors between s_z, s_y and d_x, d_y if possible
-    pub fn swap(&mut self, s_x : usize, s_y : usize, d_x : usize, d_y : usize) -> Result<bool, E>
+    pub fn swap(&mut self, s_x : usize, s_y : usize, d_x : usize, d_y : usize)
     {
         let g_board_width = self.matrix.len();
         let g_board_height = self.matrix[0].len();
         if s_x >= g_board_width || d_x >= g_board_width || 
             s_y >= g_board_height || d_y >= g_board_height
         {
-            Err("Coords out of range")
+            //Err("Coords out of range")
         }
         else if s_x == d_x && s_y == d_y
         {
-            Ok(true)
+            //Ok(true)
         }
         else
         {
-            let temp_color = matrix[s_x][s_y];
-            matrix[s_x][s_y] = matrix[d_x][d_y];
-            matrix[d_x][d_y] = temp_color;
-            Ok(true)
+            let temp_color = self.matrix[s_x][s_y];
+            self.matrix[s_x][s_y] = self.matrix[d_x][d_y];
+            self.matrix[d_x][d_y] = temp_color;
+            //Ok(true)
         }
     }
 
-    pub fn set_color(&mut self, x : usize, y : usize, new_color : RGB) -> Result<bool, E>
+    pub fn set_color(&mut self, x : usize, y : usize, new_color : RGB)
     {
         let g_board_width = self.matrix.len();
         let g_board_height = self.matrix[0].len();
         if x >= g_board_width || y >= g_board_height
         {
-            Err("Coords out of range")
+            //Err("Coords out of range")
         }
         else
         {
-            matrix[x][y] = new_color;
+            self.matrix[x][y] = new_color;
             self.set_color_in_buffer(x,y,new_color);
-            Ok(true)
+            //Ok(true)
         }
     }
 
@@ -85,8 +94,8 @@ impl<const WIDHT: usize, const HEIGHT : usize> gameboard<WIDHT,HEIGHT>{
         let mut index: u32 = 0;
         match x % 2 
         {
-            0 => index += (x*MAX_WIDHT + y) as u32,
-            1 => index += (x*MAX_WIDHT + 15-y) u32,
+            0 => index += (x*MAX_WIDTH + y) as u32,
+            1 => index += (x*MAX_WIDTH + 15-y) as u32,
             _ => (),
         }
         self.ws.set_color(new_color, index)

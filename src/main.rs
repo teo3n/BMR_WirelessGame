@@ -40,12 +40,12 @@ pub mod ws2812;
 pub mod gameboard;
 pub mod colors;
 
-use gameboard::(gameboard);
+use gameboard::Gameboard;
 use ws2812::{ Ws2812, RGB };
 
-const PIXEL_TOTAL_AMOUNT = 256;
-const X_LIMIT = 5;
-const Y_LIMIT = 5;
+const PIXEL_TOTAL_AMOUNT :usize = 256;
+const X_LIMIT :usize = 5;
+const Y_LIMIT :usize = 5;
 
 
 #[entry]
@@ -95,7 +95,7 @@ fn main() -> ! {
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
     let mut ws2 = Ws2812::<_, PIXEL_TOTAL_AMOUNT>::new(clock_speed, &mut wspin);
-    let mut board = gameboard::new(X_LIMIT,Y_LIMIT,ws2).unwrap();
+    let mut board = gameboard::Gameboard::<X_LIMIT, Y_LIMIT>::new(ws2);
 
     for x in 0..X_LIMIT
     {

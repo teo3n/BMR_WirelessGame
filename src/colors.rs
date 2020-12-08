@@ -1,6 +1,4 @@
-pub mod ws2812;
-
-use ws2812::{RGB };
+use crate::ws2812::RGB;
 
 pub const WHITE:                    RGB = RGB { r: 0xFF, g: 0xFF, b: 0xFF };
 pub const SILVER:                   RGB = RGB { r: 0xC0, g: 0xC0, b: 0xC0 };
