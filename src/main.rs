@@ -44,8 +44,8 @@ use gameboard::Gameboard;
 use ws2812::{ Ws2812, RGB };
 
 const PIXEL_TOTAL_AMOUNT: usize = 256;
-const X_LIMIT: usize = 5;
-const Y_LIMIT: usize = 5;
+const X_LIMIT: usize = 16;
+const Y_LIMIT: usize = 16;
 
 
 #[entry]
@@ -97,21 +97,29 @@ fn main() -> ! {
     let mut ws2 = Ws2812::<_, PIXEL_TOTAL_AMOUNT>::new(clock_speed, &mut wspin);
     let mut board = gameboard::Gameboard::<_>::new(&mut ws2);
 
+    // set single pixel
+    board.set_color(0, 8-1, colors::NAVY);
 
+
+    //set 2 bottom rows with alternating colors
     for x in 0..X_LIMIT
     {
-        for y in 0..Y_LIMIT
+        for y in 0..3
         {
-            if x % 2 == 0
+            if (y+x) % 2 == 0
             {
-                board.set_color(x, y, colors::RED)
+                board.set_color(x, y, colors::PURPLE);
             }
             else
             {
-                board.set_color(x, y, colors::GREEN)
+                board.set_color(x, y, colors::GREEN);
             }
         }
     }
+    //flush board 
+    board.flush();
+
+    delay.delay_ms(1000);
     loop
     {
         // let input: nunchuk::ControllerInput = nchuck.get_input();
@@ -147,14 +155,14 @@ fn main() -> ! {
         //     {
         //     }
         // }
-        for x in 0..X_LIMIT
+        for x in 1..X_LIMIT
         {
-            for y in 0..Y_LIMIT-1
+            for y in 0..3
             {
-                board.swap(x,y,x,y+1);
+                board.swap(x,y,x-1,y);
             }
         }
         board.update_matrix();
-        delay.delay_ms(500);
+        delay.delay_ms(1000);
     }
 }

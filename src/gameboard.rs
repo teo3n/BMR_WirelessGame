@@ -42,8 +42,8 @@ where T: OutputPin
         else
         {
             let temp_color = self.matrix[s_x][s_y];
-            self.matrix[s_x][s_y] = self.matrix[d_x][d_y];
-            self.matrix[d_x][d_y] = temp_color;
+            self.set_color(s_x,s_y,self.matrix[d_x][d_y]);
+            self.set_color(d_x,d_y,temp_color);
             //Ok(true)
         }
     }
@@ -64,6 +64,25 @@ where T: OutputPin
         }
     }
 
+    // Empties screen entirely and draws new data to it.
+    pub fn flush(&mut self)
+    {
+        for i in 0..PIXEL_COUNT
+        {
+            self.ws.set_color(RGB::zero(),i as u32);
+        }
+        self.update_matrix();
+
+        for y in 0..HEIGHT
+        {
+            for x in 0..WIDTH
+            {
+                self.set_color_in_buffer(x,y,self.matrix[x][y]);
+            }
+        }
+        self.update_matrix();
+    }
+
     // TODO call this function with interrupt to provide appropriate 
     // refresh rate for the screen
     pub fn update_matrix(&mut self)
@@ -75,15 +94,13 @@ where T: OutputPin
     fn set_color_in_buffer(&mut self, x: usize, y : usize, new_color : RGB)
     {
         let mut index: u32 = 0;
-        match x % 2 
+        match y % 2 
         {
-            0 => index += (x * WIDTH + y) as u32,
-            1 => index += (x * WIDTH + 15 - y) as u32,
+            0 => index += (y * WIDTH + x) as u32,
+            1 => index += (y * WIDTH + 15 - x) as u32,
             _ => (),
         }
         self.ws.set_color(new_color, index)
     }
-
-    
 
 }
