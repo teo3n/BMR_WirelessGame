@@ -33,6 +33,8 @@ pub mod lcd;
 use riscv_rt::entry;
 pub mod nunchuk;
 
+pub mod game;
+
 
 #[entry]
 fn main() -> ! {
@@ -74,7 +76,70 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
+    let mut tba_objects: [(usize, f32, f32, char); 8] = [
+        (0, 3.536f32, -3.536f32, '*'),
+        (0, -2.868f32, -4.096f32, '#'),
+        (6, -1.710f32, 4.698f32, '*'),
+        (2, -4.728f32, 1.628f32, '#'),
+        (2, 0.436f32, 4.981f32, '#'),
+        (1, 2.868f32, 4.096f32, '*'),
+        (5, -4.193f32, 2.723f32, '#'),
+        (5, 4.830f32, -1.294f32, '*'),
+    ];
+
+    let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
+    let mut number_of_objects: usize = 0;
+    let mut index = 0;
+
+    while tba_objects[index].0 == 0 {
+        let (_, x, y, symbol) = tba_objects[index];
+        objects[number_of_objects] = Some(
+            game::MovingObject::new(game::Vector {
+                x,
+                y,
+            }, symbol));
+        index += 1;
+        number_of_objects += 1;
+    }
+	
     delay.delay_ms(10);
+
+
+    loop {
+        game::print_board();
+
+        game::game_tick(&mut objects, number_of_objects);
+        game::clear_board();
+
+        while index < tba_objects.len() && tba_objects[index].0 == 0 {
+            let (_, x, y, symbol) = tba_objects[index];
+            objects[number_of_objects] = Some(
+                game::MovingObject::new(game::Vector { x, y }, symbol)
+            );
+            index += 1;
+            number_of_objects += 1;
+        }
+
+        let mut moving: bool = false;
+        for i in 0..number_of_objects {
+            let object = match objects[i] {
+                Some(o) => o,
+                None => continue,
+            };
+            unsafe {
+                let pos = object.position();
+                game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
+            }
+            moving |= object.moving();
+        }
+
+        if !moving && (index >= tba_objects.len()) {
+            break;
+        }
+        if index < tba_objects.len() {
+            tba_objects[index].0 -= 1;
+        }
+    }
 
     loop
     {
