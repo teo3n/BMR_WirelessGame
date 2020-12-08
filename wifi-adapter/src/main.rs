@@ -39,11 +39,7 @@ extern "C" {
     pub fn wifi_get_opmode() -> u8;
     pub fn wifi_get_phy_mode() -> u32;
     pub fn system_soft_wdt_feed();
-    /*
-    void ets_timer_arm_new(os_timer_t *ptimer, uint32_t time, bool repeat_flag, bool ms_flag);
-    void ets_timer_disarm(os_timer_t *ptimer);
-    void ets_timer_setfn(os_timer_t *ptimer, os_timer_func_t *pfunction, void *parg);
-    */
+
     pub fn ets_timer_disarm(timer: *mut os_timer_t);
     pub fn ets_timer_arm_new(timer: *mut os_timer_t, time: u32, repeat: u8, ms: u8);
     pub fn ets_timer_setfn(timer: *mut os_timer_t, function: ETSTimerFunc, arg: *const u32);
@@ -167,7 +163,7 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
     }
 }
 
-static mut update_timer:os_timer_t = os_timer_t {
+static mut UPDATE_TIMER:os_timer_t = os_timer_t {
     timer_next: 0 as *mut os_timer_t,
     timer_expire: 0,
     timer_period: 0,
@@ -192,8 +188,8 @@ fn user_init() {
     // Conf UART
     pin_pullup_dis(PERIPHS_IO_MUX_U0TXD_U);
     pin_func_select(PERIPHS_IO_MUX_U0TXD_U, FUNC_U0TXD);
-    //uart::init();
-    //wifi::init();
+    uart::init();
+    wifi::init();
 
     uart::writestring("Connecting Wifi\r\n");
     unsafe { ets_delay_us(500000); };
@@ -249,25 +245,13 @@ fn user_init() {
 
     
     unsafe {
-        //ets_timer_init();
         let param:u32 = 0;
         uart::writestring("Arming timer..\r\n");
-        ets_timer_disarm(& mut update_timer);
-        ets_timer_setfn(& mut update_timer, update, &param);
-        //ets_timer_arm(& mut update_timer, 1000, 1);
-        ets_timer_arm_new(& mut update_timer, 1000, 1, 1);
+        ets_timer_disarm(& mut UPDATE_TIMER);
+        ets_timer_setfn(& mut UPDATE_TIMER, update, &param);
+        ets_timer_arm_new(& mut UPDATE_TIMER, 1000, 1, 1);
     };
 
     server::init();
 
-/*
-    loop {
-
-        uart::writestring("Loop..");
-        uart::writenum(i);
-        uart::writestring("\r\n");
-        unsafe { ets_delay_us(100000); };
-        i = i+1;
-    }
-    */
 }
