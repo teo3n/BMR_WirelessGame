@@ -4,6 +4,8 @@
 #[allow(unused_mut)]
 #[allow(dead_code)]
 
+const SERVER_MODE: u32 = 1;
+
 pub type ETSTimerFunc = unsafe extern "C" fn(timer_arg: *const u32);
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -150,16 +152,53 @@ unsafe extern "C" fn user_rf_cal_sector_set() -> u32
     return 512 - 5;
 }
 
+static mut CONNECTED:bool = false;
+
 #[no_mangle]
 #[link(name="update")]
 unsafe extern "C" fn update(timer_arg: *const u32) {
-    let mut byte: u8 = 0;
-    // Read chars from the uart and push to the tcp-connection buffer
-    while uart::readchr(&mut byte) {
-        server::writechr(byte);
+
+    if SERVER_MODE == 0 {
+        if CONNECTED == false {
+            
+            uart::writestring("Check connection..");
+            let status = wifi::is_connected();
+            if status == 5 { // Status == Connected
+                CONNECTED = true;
+            } else { // else wait for the next update                
+                return;
+            }
+            uart::writenum(status as i32);
+            uart::writestring("..stationmode..");
+            unsafe { uart::writenum(wifi_get_opmode() as i32); };
+            uart::writestring("..phymode..");
+            unsafe { uart::writenum(wifi_get_phy_mode() as i32); };
+            uart::writestring("\r\n");
+
+            // Print out IP address for debugging
+            let ip = wifi::get_ip();
+
+            uart::writestring("IP: ");
+            uart::writenum((ip >> 24) as i32);
+            uart::writestring(".");
+            uart::writenum((ip >> 16 & 0xff) as i32);
+            uart::writestring(".");
+            uart::writenum((ip >> 8 & 0xff) as i32);
+            uart::writestring(".");
+            uart::writenum((ip & 0xff) as i32);
+            uart::writestring("\r\n");
+        }
+
+    } else {
+        let mut byte: u8 = 0;
+
+        // Read chars from the uart and push to the tcp-connection buffer
+        while uart::readchr(&mut byte) {
+            server::writechr(byte);
+        }
+        // Send the entire buffer
+        server::sendbuf();
     }
-    // Send the entire buffer
-    server::sendbuf();
 }
 
 static mut UPDATE_TIMER:os_timer_t = os_timer_t {
@@ -175,13 +214,11 @@ static mut UPDATE_TIMER:os_timer_t = os_timer_t {
 #[link(name="user_init")]
 fn user_init() {
 
-
     unsafe {
         system_timer_reinit();
-        //system_soft_wdt_stop();
-        //ets_wdt_disable();
     };
 
+    // GPIO16 is a special pin, but the only LED in my ESP-wroom-02 WEMOS
     gpio16_output_conf();
     
     // Conf UART
@@ -190,67 +227,21 @@ fn user_init() {
     uart::init();
     wifi::init();
 
-    uart::writestring("Connecting Wifi\r\n");
-    unsafe { ets_delay_us(500000); };
-    let con_status = wifi::connect("BMR_wireless", "wire123456");
-    uart::writestring("Con status: ");
-    uart::writenum(con_status as i32);
-    uart::writestring("\r\n");
-    let mut i = -5;
+    if SERVER_MODE == 0 { // Client mode
+        uart::writestring("Connecting Wifi\r\n");
+        let con_status = wifi::connect("BMR_wireless", "wire123456");
 
-
-    let mut connected = false;
-
-    while !connected {
-        unsafe { ets_delay_us(1000000); };
-        uart::writestring("Check connection..");
-        let status = wifi::is_connected();
-        if status == 5 {
-            connected = true;
-        }
-        uart::writenum(status as i32);
-        uart::writestring("..stationmode..");
-        unsafe { uart::writenum(wifi_get_opmode() as i32); };
-        uart::writestring("..phymode..");
-        unsafe { uart::writenum(wifi_get_phy_mode() as i32); };        
-
-        uart::writestring("\r\n");
-        //timer1.delay_ms(500);
-        unsafe { ets_delay_us(500000); };
-        //unsafe { GPIO_OUT_W1TS_ADDRESS.write_volatile(1<<16); };
-        gpio16_output_set(1);
-        unsafe { ets_delay_us(100000); };
-        //unsafe { GPIO_OUT_W1TC_ADDRESS.write_volatile(1<<16); };
-        gpio16_output_set(0);
-
-
-        unsafe { system_soft_wdt_feed(); };
-
-        let ip = wifi::get_ip();
-
-        uart::writestring("IP: ");
-        uart::writenum((ip >> 24) as i32);
-        uart::writestring(".");
-        uart::writenum((ip >> 16 & 0xff) as i32);
-        uart::writestring(".");
-        uart::writenum((ip >> 8 & 0xff) as i32);
-        uart::writestring(".");
-        uart::writenum((ip & 0xff) as i32);
-        uart::writestring("\r\n");
-
-        connected = true;
-
-    }
-
+    } else { // Server mode
+        uart::writestring("Setup Wifi server\r\n");
+        let con_status = wifi::setup_server("BMR_wireless", "wire123456");
+        server::init();
+    }    
     
     unsafe {
         let param:u32 = 0;
-        //uart::writestring("Arming timer..\r\n");
         ets_timer_disarm(& mut UPDATE_TIMER);
         ets_timer_setfn(& mut UPDATE_TIMER, update, &param);
         ets_timer_arm_new(& mut UPDATE_TIMER, 100, 1, 1);
     };
-
-    server::init();
 
 }
