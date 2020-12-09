@@ -119,7 +119,13 @@ pub fn writechr(val: u8) {
     unsafe {
         SEND_BUFFER[BUFFER_POS as usize] = val;
         BUFFER_POS= BUFFER_POS+1;
+        // Flush if buffer already full
+        if BUFFER_POS == 100 {
+            sendbuf();
+        }
     };
+
+
 }
 
 pub fn sendbuf() {
