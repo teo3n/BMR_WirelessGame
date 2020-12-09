@@ -153,14 +153,13 @@ unsafe extern "C" fn user_rf_cal_sector_set() -> u32
 #[no_mangle]
 #[link(name="update")]
 unsafe extern "C" fn update(timer_arg: *const u32) {
-    gpio16_output_set(1);
-    unsafe { ets_delay_us(1000); };    
-    gpio16_output_set(0);
-    uart::writestring("Timer Test\r\n");
     let mut byte: u8 = 0;
+    // Read chars from the uart and push to the tcp-connection buffer
     while uart::readchr(&mut byte) {
-        uart::writechr(byte);
+        server::writechr(byte);
     }
+    // Send the entire buffer
+    server::sendbuf();
 }
 
 static mut UPDATE_TIMER:os_timer_t = os_timer_t {
@@ -246,10 +245,10 @@ fn user_init() {
     
     unsafe {
         let param:u32 = 0;
-        uart::writestring("Arming timer..\r\n");
+        //uart::writestring("Arming timer..\r\n");
         ets_timer_disarm(& mut UPDATE_TIMER);
         ets_timer_setfn(& mut UPDATE_TIMER, update, &param);
-        ets_timer_arm_new(& mut UPDATE_TIMER, 1000, 1, 1);
+        ets_timer_arm_new(& mut UPDATE_TIMER, 100, 1, 1);
     };
 
     server::init();

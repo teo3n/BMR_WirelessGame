@@ -103,8 +103,6 @@ unsafe extern "C" fn dummy_func(arg:*const u32)
 #[link(name="webserver_recv")]
 unsafe extern "C" fn webserver_recv(arg:*mut u32, data: *const u8, len: u16)
 {
-  //struct espconn *ptrespconn = arg;
-  //espconn_send(ptrespconn, buffer, 4);
   for i in 0..len {
     uart::writechr(*data.offset(i as isize));
   }
@@ -114,8 +112,6 @@ unsafe extern "C" fn webserver_recv(arg:*mut u32, data: *const u8, len: u16)
 #[link(name="webserver_listen")]
 unsafe extern "C" fn webserver_listen(arg:*mut u32)
 {
-    //struct espconn *pesp_conn = arg;
-    //CONN = ;
     espconn_regist_recvcb(core::mem::transmute::<*mut u32,* mut espconn>(arg), webserver_recv);
 }
 
@@ -128,8 +124,10 @@ pub fn writechr(val: u8) {
 
 pub fn sendbuf() {
     unsafe {
-        espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
-        BUFFER_POS = 0;
+        if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 {
+            espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
+            BUFFER_POS = 0;
+        }
     };
 }
 
