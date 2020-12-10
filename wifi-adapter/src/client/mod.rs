@@ -39,11 +39,11 @@ pub struct espconn {
     pub reverse: *mut u32,
 }
 
-
 extern "C" {
     pub fn espconn_regist_connectcb(espconn: *mut espconn, connect_cb: espconn_connect_callback) -> u8;
-    pub fn espconn_regist_recvcb(espconn: *mut espconn, recv_cb: espconn_recv_callback) -> u8;
-    pub fn espconn_accept(espconn: *mut espconn) -> u8;
+    pub fn espconn_regist_disconcb(espconn: *mut espconn, connect_cb: espconn_connect_callback) -> u8;    
+    pub fn espconn_regist_recvcb(espconn: *mut espconn, recv_cb: espconn_recv_callback) -> u8;    
+    pub fn espconn_connect(espconn: *mut espconn) -> u8;
     pub fn espconn_send(espconn: *mut espconn, psent: *const u8, length: u16) -> u8;
 }
 
@@ -72,17 +72,17 @@ static mut TCP1: esp_tcp = esp_tcp {
     local_port: 0,
     local_ip: 0,
     remote_ip: 0,
-    connect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
-    reconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_reconnect_callback>(dummy_func) },
-    disconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
-	write_finish_fn: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
+    connect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func_client) },
+    reconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_reconnect_callback>(dummy_func_client) },
+    disconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func_client) },
+	write_finish_fn: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func_client) },
 };
 static mut CONN: espconn = espconn { 
     conn_type: 0,
     state: 0,
     tcp: unsafe { core::mem::transmute::<u32,*mut esp_tcp>(0) } ,
-    recv_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_recv_callback>(dummy_func) } ,
-    sent_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_sent_callback>(dummy_func) } ,
+    recv_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_recv_callback>(dummy_func_client) } ,
+    sent_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_sent_callback>(dummy_func_client) } ,
     ink_cnt: 0,
     reverse: unsafe { core::mem::transmute::<u32,*mut u32>(0) } ,
 };
@@ -95,13 +95,13 @@ static mut IN_CONN: * mut espconn = unsafe { core::mem::transmute::<u32,* mut es
 // "type validation failed: encountered 0x00000000 at xxx, but expected a function pointer"
 #[no_mangle]
 #[link(name="dummy_func")]
-unsafe extern "C" fn dummy_func(arg:*const u32)
+unsafe extern "C" fn dummy_func_client(arg:*const u32)
 {
 }
 
 #[no_mangle]
-#[link(name="webserver_recv")]
-unsafe extern "C" fn webserver_recv(arg:*mut u32, data: *const u8, len: u16)
+#[link(name="webclient_recv")]
+unsafe extern "C" fn webclient_recv(arg:*mut u32, data: *const u8, len: u16)
 {
   for i in 0..len {
     uart::writechr(*data.offset(i as isize));
@@ -109,11 +109,10 @@ unsafe extern "C" fn webserver_recv(arg:*mut u32, data: *const u8, len: u16)
 }
 
 #[no_mangle]
-#[link(name="webserver_listen")]
-unsafe extern "C" fn webserver_listen(arg:*mut u32)
+#[link(name="webclient_connect")]
+unsafe extern "C" fn webclient_connect(arg:*mut u32)
 {
-    IN_CONN = core::mem::transmute::<*mut u32,* mut espconn>(arg);
-    espconn_regist_recvcb(IN_CONN, webserver_recv);
+    espconn_regist_recvcb(core::mem::transmute::<*mut u32,* mut espconn>(arg), webclient_recv);
 }
 
 pub fn writechr(val: u8) {
@@ -125,8 +124,6 @@ pub fn writechr(val: u8) {
             sendbuf();
         }
     };
-
-
 }
 
 pub fn sendbuf() {
@@ -141,13 +138,14 @@ pub fn sendbuf() {
 pub fn init() {
 
     unsafe {
-        TCP1.local_port = 8000;
+        TCP1.remote_port = 8000;
+        TCP1.remote_ip = 0xc0a80401;
         CONN.conn_type = espconn_type::ESPCONN_TCP as u32;
         CONN.state = espconn_state::ESPCONN_NONE as u32;
 
         CONN.tcp = & mut TCP1;    
     
-        espconn_regist_connectcb(& mut CONN, webserver_listen);
-        espconn_accept(& mut CONN);
+        espconn_regist_connectcb(& mut CONN, webclient_connect);
+        espconn_connect(& mut CONN);
     };
 }

@@ -130,6 +130,7 @@ fn gpio_set(pin:u32, val:u32) -> bool {
 mod uart;
 mod wifi;
 mod server;
+mod client;
 
 use core::panic::PanicInfo;
 
@@ -191,7 +192,14 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
             uart::writenum((ip & 0xff) as i32);
             uart::writestring("\r\n");
         }
+        let mut byte: u8 = 0;
 
+        // Read chars from the uart and push to the tcp-connection buffer
+        while uart::readchr(&mut byte) {
+            client::writechr(byte);
+        }
+        // Send the entire buffer
+        client::sendbuf();
     } else {
         let mut byte: u8 = 0;
 
