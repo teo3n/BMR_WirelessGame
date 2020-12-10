@@ -5,6 +5,9 @@
 #[allow(dead_code)]
 
 const SERVER_MODE: u32 = 1;
+const SSID: &str = "BMR_wireless";
+const PASSWORD: &str = "wire123456";
+
 
 pub type ETSTimerFunc = unsafe extern "C" fn(timer_arg: *const u32);
 #[repr(C)]
@@ -229,11 +232,11 @@ fn user_init() {
 
     if SERVER_MODE == 0 { // Client mode
         uart::writestring("Connecting Wifi\r\n");
-        let con_status = wifi::connect("BMR_wireless", "wire123456");
+        let con_status = wifi::connect(SSID, PASSWORD);
 
     } else { // Server mode
         uart::writestring("Setup Wifi server\r\n");
-        let con_status = wifi::setup_server("BMR_wireless", "wire123456");
+        let con_status = wifi::setup_server(SSID, PASSWORD);
         server::init();
     }    
     
