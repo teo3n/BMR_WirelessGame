@@ -4,8 +4,8 @@
 #[allow(unused_mut)]
 #[allow(dead_code)]
 
-const SERVER_MODE: u32 = 1;
-const SSID: &str = "BMR_wireless";
+const SERVER_MODE: u32 = 0;
+const SSID: &str = "BMR_wirele";
 const PASSWORD: &str = "wire123456";
 
 
@@ -191,6 +191,10 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
             uart::writestring(".");
             uart::writenum((ip >> 24) as i32);
             uart::writestring("\r\n");
+
+            client::init();
+
+            return;
         }
         let mut byte: u8 = 0;
 
@@ -201,6 +205,10 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
         // Send the entire buffer
         client::sendbuf();
     } else {
+        if CONNECTED == false {
+            server::init();
+            CONNECTED = true;
+        }
         let mut byte: u8 = 0;
 
         // Read chars from the uart and push to the tcp-connection buffer
@@ -241,11 +249,16 @@ fn user_init() {
     if SERVER_MODE == 0 { // Client mode
         uart::writestring("Connecting Wifi\r\n");
         let con_status = wifi::connect(SSID, PASSWORD);
+        uart::writestring("Status: ");
+        uart::writenum(con_status);
+        uart::writestring("\r\n");
 
     } else { // Server mode
         uart::writestring("Setup Wifi server\r\n");
         let con_status = wifi::setup_server(SSID, PASSWORD);
-        server::init();
+        uart::writestring("Status: ");
+        uart::writenum(con_status);
+        uart::writestring("\r\n");        
     }    
     
     unsafe {
