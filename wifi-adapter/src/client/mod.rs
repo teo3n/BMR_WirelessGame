@@ -112,6 +112,7 @@ unsafe extern "C" fn webclient_recv(arg:*mut u32, data: *const u8, len: u16)
 #[link(name="webclient_connect")]
 unsafe extern "C" fn webclient_connect(arg:*mut u32)
 {
+    uart::writestring("TCP conn made..\r\n");
     espconn_regist_recvcb(core::mem::transmute::<*mut u32,* mut espconn>(arg), webclient_recv);
 }
 
@@ -130,8 +131,8 @@ pub fn sendbuf() {
     unsafe {
         if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 {
             espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
-            BUFFER_POS = 0;
         }
+        BUFFER_POS = 0;
     };
 }
 
@@ -139,7 +140,7 @@ pub fn init() {
 
     unsafe {
         TCP1.remote_port = 8000;
-        TCP1.remote_ip = 0xc0a80401;
+        TCP1.remote_ip = 0x0104a8c0; // 192.168.4.1
         CONN.conn_type = espconn_type::ESPCONN_TCP as u32;
         CONN.state = espconn_state::ESPCONN_NONE as u32;
 
