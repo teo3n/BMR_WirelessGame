@@ -183,13 +183,13 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
             let ip = wifi::get_ip();
 
             uart::writestring("IP: ");
-            uart::writenum((ip >> 24) as i32);
+            uart::writenum((ip & 0xff) as i32);            
+            uart::writestring(".");
+            uart::writenum((ip >> 8 & 0xff) as i32);            
             uart::writestring(".");
             uart::writenum((ip >> 16 & 0xff) as i32);
             uart::writestring(".");
-            uart::writenum((ip >> 8 & 0xff) as i32);
-            uart::writestring(".");
-            uart::writenum((ip & 0xff) as i32);
+            uart::writenum((ip >> 24) as i32);
             uart::writestring("\r\n");
         }
         let mut byte: u8 = 0;
