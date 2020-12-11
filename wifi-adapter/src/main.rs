@@ -163,7 +163,7 @@ static mut CONNECTED:bool = false;
 unsafe extern "C" fn update(timer_arg: *const u32) {
 
     if SERVER_MODE == 0 {
-        if CONNECTED == false {
+        if wifi::is_connected() != 5 {
             
             uart::writestring("Check connection..");
             let status = wifi::is_connected();
@@ -173,13 +173,16 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
                 return;
             }
             uart::writenum(status as i32);
+            /*
             uart::writestring("..stationmode..");
             unsafe { uart::writenum(wifi_get_opmode() as i32); };
             uart::writestring("..phymode..");
             unsafe { uart::writenum(wifi_get_phy_mode() as i32); };
+            */
             uart::writestring("\r\n");
 
             // Print out IP address for debugging
+            /*
             let ip = wifi::get_ip();
 
             uart::writestring("IP: ");
@@ -191,7 +194,7 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
             uart::writestring(".");
             uart::writenum((ip >> 24) as i32);
             uart::writestring("\r\n");
-
+            */
             client::init();
 
             return;
@@ -200,6 +203,7 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
 
         // Read chars from the uart and push to the tcp-connection buffer
         while uart::readchr(&mut byte) {
+            uart::writechr(byte);
             client::writechr(byte);
         }
         // Send the entire buffer

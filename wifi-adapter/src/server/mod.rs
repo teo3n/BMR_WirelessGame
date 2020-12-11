@@ -95,7 +95,7 @@ static mut IN_CONN: * mut espconn = unsafe { core::mem::transmute::<u32,* mut es
 // "type validation failed: encountered 0x00000000 at xxx, but expected a function pointer"
 #[no_mangle]
 #[link(name="dummy_func")]
-unsafe extern "C" fn dummy_func(arg:*const u32)
+pub unsafe extern "C" fn dummy_func(arg:*const u32)
 {
 }
 
@@ -132,7 +132,7 @@ pub fn writechr(val: u8) {
 
 pub fn sendbuf() {
     unsafe {
-        if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 {
+        if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 && BUFFER_POS != 0  {
             espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
         }
         BUFFER_POS = 0;

@@ -45,6 +45,7 @@ extern "C" {
     pub fn espconn_regist_recvcb(espconn: *mut espconn, recv_cb: espconn_recv_callback) -> u8;    
     pub fn espconn_connect(espconn: *mut espconn) -> u8;
     pub fn espconn_send(espconn: *mut espconn, psent: *const u8, length: u16) -> u8;
+    pub fn dummy_func(arg:*const u32);
 }
 
 #[repr(u32)]
@@ -72,17 +73,17 @@ static mut TCP1: esp_tcp = esp_tcp {
     local_port: 0,
     local_ip: 0,
     remote_ip: 0,
-    connect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func_client) },
-    reconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_reconnect_callback>(dummy_func_client) },
-    disconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func_client) },
-	write_finish_fn: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func_client) },
+    connect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
+    reconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_reconnect_callback>(dummy_func) },
+    disconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
+	write_finish_fn: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
 };
 static mut CONN: espconn = espconn { 
     conn_type: 0,
     state: 0,
     tcp: unsafe { core::mem::transmute::<u32,*mut esp_tcp>(0) } ,
-    recv_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_recv_callback>(dummy_func_client) } ,
-    sent_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_sent_callback>(dummy_func_client) } ,
+    recv_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_recv_callback>(dummy_func) } ,
+    sent_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_sent_callback>(dummy_func) } ,
     ink_cnt: 0,
     reverse: unsafe { core::mem::transmute::<u32,*mut u32>(0) } ,
 };
@@ -91,13 +92,6 @@ static mut SEND_BUFFER: [u8; 100usize] = [0;100];
 static mut BUFFER_POS: u16 = 0;
 static mut IN_CONN: * mut espconn = unsafe { core::mem::transmute::<u32,* mut espconn>(0) } ;
 
-// Just so that the rust compiler doesn't complain about null pointers
-// "type validation failed: encountered 0x00000000 at xxx, but expected a function pointer"
-#[no_mangle]
-#[link(name="dummy_func")]
-unsafe extern "C" fn dummy_func_client(arg:*const u32)
-{
-}
 
 #[no_mangle]
 #[link(name="webclient_recv")]
@@ -116,6 +110,15 @@ unsafe extern "C" fn webclient_connect(arg:*mut u32)
     espconn_regist_recvcb(core::mem::transmute::<*mut u32,* mut espconn>(arg), webclient_recv);
 }
 
+#[no_mangle]
+#[link(name="webclient_disconnect")]
+unsafe extern "C" fn webclient_disconnect(arg:*mut u32)
+{
+    uart::writestring("TCP conn lost..\r\n");
+    IN_CONN = unsafe { core::mem::transmute::<u32,* mut espconn>(0) } ;
+    init();
+}
+
 pub fn writechr(val: u8) {
     unsafe {
         SEND_BUFFER[BUFFER_POS as usize] = val;
@@ -129,7 +132,7 @@ pub fn writechr(val: u8) {
 
 pub fn sendbuf() {
     unsafe {
-        if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 {
+        if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 && BUFFER_POS != 0 {
             espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
         }
         BUFFER_POS = 0;
@@ -147,6 +150,7 @@ pub fn init() {
         CONN.tcp = & mut TCP1;    
     
         espconn_regist_connectcb(& mut CONN, webclient_connect);
+        espconn_regist_disconcb(& mut CONN, webclient_disconnect);
         espconn_connect(& mut CONN);
     };
 }

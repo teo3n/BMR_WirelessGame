@@ -249,13 +249,7 @@ pub fn setup_server(ssid: &str, passwd: &str) -> i32 {
 }
 
 pub fn is_connected() -> u8 {
-
-    let mut ipconfig = ip_info {
-        ip: ip_addr { addr: 0 },
-        netmask: ip_addr { addr: 0 },
-        gw: ip_addr { addr: 0 },
-    };
-    unsafe { //wifi_get_ip_info(STATION_IF, & mut ipconfig);
+    unsafe {
         return wifi_station_get_connect_status();
     };
 }
@@ -268,16 +262,4 @@ pub fn get_ip() -> u32 {
     };
     unsafe { wifi_get_ip_info(STATION_IF, & mut ipconfig); };
     return ipconfig.ip.addr;
-}
-
-pub fn send_data(input: i32) -> bool {
-
-
-    true
-}
-
-pub fn recv_data(input: i32) -> bool {
-
-
-    true
 }
