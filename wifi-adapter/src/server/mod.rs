@@ -112,6 +112,7 @@ unsafe extern "C" fn webserver_recv(arg:*mut u32, data: *const u8, len: u16)
 #[link(name="webserver_listen")]
 unsafe extern "C" fn webserver_listen(arg:*mut u32)
 {
+    uart::writestring("Incoming conn..\r\n");
     IN_CONN = core::mem::transmute::<*mut u32,* mut espconn>(arg);
     espconn_regist_recvcb(IN_CONN, webserver_recv);
 }
@@ -133,8 +134,8 @@ pub fn sendbuf() {
     unsafe {
         if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 {
             espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
-            BUFFER_POS = 0;
         }
+        BUFFER_POS = 0;
     };
 }
 
