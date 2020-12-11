@@ -39,12 +39,22 @@ pub struct espconn {
     pub reverse: *mut u32,
 }
 
+#[repr(u32)]
+pub enum espconn_level{
+	ESPCONN_KEEPIDLE = 0,
+	ESPCONN_KEEPINTVL = 1,
+	ESPCONN_KEEPCNT = 2,
+}
+
+const ESPCONN_KEEPALIVE: u32 = 0x08;
 
 extern "C" {
     pub fn espconn_regist_connectcb(espconn: *mut espconn, connect_cb: espconn_connect_callback) -> u8;
     pub fn espconn_regist_recvcb(espconn: *mut espconn, recv_cb: espconn_recv_callback) -> u8;
     pub fn espconn_accept(espconn: *mut espconn) -> u8;
     pub fn espconn_send(espconn: *mut espconn, psent: *const u8, length: u16) -> u8;
+    pub fn espconn_set_opt(espconn: *mut espconn,opt: u32);
+    pub fn espconn_set_keepalive(espconn: *mut espconn,param: u32, arg:*const u32);
 }
 
 #[repr(u32)]
@@ -111,9 +121,17 @@ unsafe extern "C" fn webserver_recv(arg:*mut u32, data: *const u8, len: u16)
 #[no_mangle]
 #[link(name="webserver_listen")]
 unsafe extern "C" fn webserver_listen(arg:*mut u32)
-{
+{    
     uart::writestring("Incoming conn..\r\n");
     IN_CONN = core::mem::transmute::<*mut u32,* mut espconn>(arg);
+    let mut keep_alive:u32 = 1;
+    espconn_set_opt(IN_CONN, ESPCONN_KEEPALIVE);
+    espconn_set_keepalive(IN_CONN, espconn_level::ESPCONN_KEEPIDLE as u32, &keep_alive);
+    keep_alive = 5; //repeat interval = 5s
+    espconn_set_keepalive(IN_CONN, espconn_level::ESPCONN_KEEPINTVL as u32, &keep_alive);
+    keep_alive = 2;//repeat 2times
+    espconn_set_keepalive(IN_CONN, espconn_level::ESPCONN_KEEPCNT as u32, &keep_alive);
+
     espconn_regist_recvcb(IN_CONN, webserver_recv);
 }
 

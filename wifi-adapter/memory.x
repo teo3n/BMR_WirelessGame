@@ -158,6 +158,7 @@ SECTIONS
     *libmbedtls.a:(.literal .text .literal.* .text.*)
 
     *(.irom0.literal .irom.literal .irom.text.literal .irom0.text .irom.text)
+    *(*u64* *i64* *ringbuf_* *compiler_builtins5abort*)
     *(*core9panicking* *compiler_builtins..int..LargeInt* *compiler_builtins5float* *compiler_builtins..float* *compiler_builtins5float* *compiler_builtins..int..WideInt* *ringbuf_*) /* Rust builtin trash */
     _irom0_text_end = ABSOLUTE(.);
   } >irom0_0_seg :irom0_0_phdr

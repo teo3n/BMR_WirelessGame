@@ -46,6 +46,8 @@ extern "C" {
     pub fn espconn_connect(espconn: *mut espconn) -> u8;
     pub fn espconn_send(espconn: *mut espconn, psent: *const u8, length: u16) -> u8;
     pub fn dummy_func(arg:*const u32);
+    pub fn espconn_set_opt(espconn: *mut espconn,opt: u32);
+    pub fn espconn_set_keepalive(espconn: *mut espconn,param: u32, arg:*const u32);
 }
 
 #[repr(u32)]
@@ -67,6 +69,15 @@ pub enum espconn_type {
     /* ESPCONN_UDP Group */
     ESPCONN_UDP        = 0x20,
 }
+
+#[repr(u32)]
+pub enum espconn_level{
+	ESPCONN_KEEPIDLE = 0,
+	ESPCONN_KEEPINTVL = 1,
+	ESPCONN_KEEPCNT = 2,
+}
+
+const ESPCONN_KEEPALIVE: u32 = 0x08;
 
 static mut TCP1: esp_tcp = esp_tcp {
     remote_port: 0,
@@ -108,6 +119,15 @@ unsafe extern "C" fn webclient_connect(arg:*mut u32)
 {
     unsafe { CONNECTED = true; };
     uart::writestring("TCP conn made..\r\n");
+
+    let mut keep_alive:u32 = 1;
+    espconn_set_opt(core::mem::transmute::<*mut u32,* mut espconn>(arg), ESPCONN_KEEPALIVE);
+    espconn_set_keepalive(core::mem::transmute::<*mut u32,* mut espconn>(arg), espconn_level::ESPCONN_KEEPIDLE as u32, &keep_alive);
+    keep_alive = 5; //repeat interval = 5s
+    espconn_set_keepalive(core::mem::transmute::<*mut u32,* mut espconn>(arg), espconn_level::ESPCONN_KEEPINTVL as u32, &keep_alive);
+    keep_alive = 2;//repeat 2times
+    espconn_set_keepalive(core::mem::transmute::<*mut u32,* mut espconn>(arg), espconn_level::ESPCONN_KEEPCNT as u32, &keep_alive);
+
     espconn_regist_recvcb(core::mem::transmute::<*mut u32,* mut espconn>(arg), webclient_recv);
 }
 

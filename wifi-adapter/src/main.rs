@@ -150,11 +150,11 @@ fn panic(_info: &PanicInfo) -> ! {
     }
 }
 
-
+/*
 #[no_mangle]
 #[link(name="user_pre_init")]
 unsafe extern "C" fn user_pre_init() -> u8 { return 0; }
-
+*/
 
 #[no_mangle]
 #[link(name="user_rf_cal_sector_set")]
@@ -171,7 +171,7 @@ static mut CON_CHECK:u8 = 0;
 unsafe extern "C" fn update(timer_arg: *const u32) {
 
     if SERVER_MODE == 0 {
-        if CON_CHECK == 21 {
+        if CON_CHECK == 11 {
             CON_CHECK = 0;
             if wifi::is_connected() != 5 {
                 CONNECTED = false;
@@ -181,6 +181,11 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
                 if CONNECTED == false {
                     CONNECTED = true; 
                     client::init();
+                } else {
+                    client::writechr('N' as u8);
+                    client::writechr('O' as u8);
+                    client::writechr('P' as u8);
+                    client::writechr('\n' as u8);
                 }
             }
         }
