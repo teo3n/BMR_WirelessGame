@@ -119,6 +119,13 @@ fn gpio16_output_set(value: u32)
     };
 }
 
+fn gpio16_output_toggle()
+{
+    unsafe {        
+        RTC_GPIO_OUT.write_volatile(RTC_GPIO_OUT.read_volatile() ^ 1);
+    };
+}
+
 fn gpio_set(pin:u32, val:u32) -> bool {
     unsafe { gpio_output_set((val)<<pin, ((!(val))&0x01)<<pin, 1<<pin,0); };
     true
@@ -169,7 +176,7 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
             if wifi::is_connected() != 5 {
                 CONNECTED = false;
                 uart::writestring(".");
-                return;                
+                return;
             } else {
                 if CONNECTED == false {
                     CONNECTED = true; 
@@ -189,6 +196,11 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
             uart::writechr(byte);
             client::writechr(byte);
         }
+
+        if byte != 0 {
+            gpio16_output_toggle();
+        }
+
         // Send the entire buffer
         client::sendbuf();
     } else {
@@ -202,6 +214,11 @@ unsafe extern "C" fn update(timer_arg: *const u32) {
         while uart::readchr(&mut byte) {
             server::writechr(byte);
         }
+
+        if byte != 0 {
+            gpio16_output_toggle();
+        }
+
         // Send the entire buffer
         server::sendbuf();
     }
