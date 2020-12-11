@@ -206,12 +206,11 @@ pub fn setup_server(ssid: &str, passwd: &str) -> i32 {
             netmask: ip_addr { addr: 0xffffff00 },
             gw: ip_addr { addr: 0x0a0a0001 },
         };
-
-        /*
+        
         if wifi_set_phy_mode(PHY_MODE_11N) == 0 {
             return 2;
         }
-        */
+        
         //wifi_softap_dhcps_stop();
         /*
         if wifi_set_ip_info(SOFTAP_IF, & mut ipconfig) == 0 {
@@ -267,7 +266,7 @@ pub fn get_ip() -> u32 {
         netmask: ip_addr { addr: 0 },
         gw: ip_addr { addr: 0 },
     };
-    unsafe { wifi_get_ip_info(SOFTAP_IF, & mut ipconfig); };
+    unsafe { wifi_get_ip_info(STATION_IF, & mut ipconfig); };
     return ipconfig.ip.addr;
 }
 
