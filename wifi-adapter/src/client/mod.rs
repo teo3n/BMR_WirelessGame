@@ -90,7 +90,7 @@ static mut CONN: espconn = espconn {
 
 static mut SEND_BUFFER: [u8; 100usize] = [0;100];
 static mut BUFFER_POS: u16 = 0;
-static mut IN_CONN: * mut espconn = unsafe { core::mem::transmute::<u32,* mut espconn>(0) } ;
+static mut CONNECTED: bool = false;
 
 
 #[no_mangle]
@@ -106,6 +106,7 @@ unsafe extern "C" fn webclient_recv(arg:*mut u32, data: *const u8, len: u16)
 #[link(name="webclient_connect")]
 unsafe extern "C" fn webclient_connect(arg:*mut u32)
 {
+    unsafe { CONNECTED = true; };
     uart::writestring("TCP conn made..\r\n");
     espconn_regist_recvcb(core::mem::transmute::<*mut u32,* mut espconn>(arg), webclient_recv);
 }
@@ -114,8 +115,8 @@ unsafe extern "C" fn webclient_connect(arg:*mut u32)
 #[link(name="webclient_disconnect")]
 unsafe extern "C" fn webclient_disconnect(arg:*mut u32)
 {
-    uart::writestring("TCP conn lost..\r\n");
-    IN_CONN = unsafe { core::mem::transmute::<u32,* mut espconn>(0) } ;
+    unsafe { CONNECTED = false; };
+    uart::writestring("TCP conn lost..\r\n");    
     init();
 }
 
@@ -132,8 +133,8 @@ pub fn writechr(val: u8) {
 
 pub fn sendbuf() {
     unsafe {
-        if unsafe { core::mem::transmute::<* mut espconn, u32>(IN_CONN) } != 0 && BUFFER_POS != 0 {
-            espconn_send(IN_CONN, &SEND_BUFFER[0], BUFFER_POS);
+        if unsafe { CONNECTED } && BUFFER_POS != 0 {
+            espconn_send(& mut CONN, &SEND_BUFFER[0], BUFFER_POS);
         }
         BUFFER_POS = 0;
     };
@@ -142,6 +143,7 @@ pub fn sendbuf() {
 pub fn init() {
 
     unsafe {
+        unsafe { CONNECTED = false; } ;
         TCP1.remote_port = 8000;
         TCP1.remote_ip = 0x0104a8c0; // 192.168.4.1
         CONN.conn_type = espconn_type::ESPCONN_TCP as u32;

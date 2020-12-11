@@ -157,46 +157,29 @@ unsafe extern "C" fn user_rf_cal_sector_set() -> u32
 }
 
 static mut CONNECTED:bool = false;
+static mut CON_CHECK:u8 = 0;
 
 #[no_mangle]
 #[link(name="update")]
 unsafe extern "C" fn update(timer_arg: *const u32) {
 
     if SERVER_MODE == 0 {
-        if wifi::is_connected() != 5 {
-            
-            uart::writestring("Check connection..");
-            let status = wifi::is_connected();
-            if status == 5 { // Status == Connected
-                CONNECTED = true;
-            } else { // else wait for the next update                
-                return;
+        if CON_CHECK == 21 {
+            CON_CHECK = 0;
+            if wifi::is_connected() != 5 {
+                CONNECTED = false;
+                uart::writestring(".");
+                return;                
+            } else {
+                if CONNECTED == false {
+                    CONNECTED = true; 
+                    client::init();
+                }
             }
-            uart::writenum(status as i32);
-            /*
-            uart::writestring("..stationmode..");
-            unsafe { uart::writenum(wifi_get_opmode() as i32); };
-            uart::writestring("..phymode..");
-            unsafe { uart::writenum(wifi_get_phy_mode() as i32); };
-            */
-            uart::writestring("\r\n");
+        }
+        CON_CHECK = CON_CHECK + 1;
 
-            // Print out IP address for debugging
-            /*
-            let ip = wifi::get_ip();
-
-            uart::writestring("IP: ");
-            uart::writenum((ip & 0xff) as i32);            
-            uart::writestring(".");
-            uart::writenum((ip >> 8 & 0xff) as i32);            
-            uart::writestring(".");
-            uart::writenum((ip >> 16 & 0xff) as i32);
-            uart::writestring(".");
-            uart::writenum((ip >> 24) as i32);
-            uart::writestring("\r\n");
-            */
-            client::init();
-
+        if !CONNECTED {
             return;
         }
         let mut byte: u8 = 0;
@@ -267,7 +250,6 @@ fn user_init() {
     
     unsafe {
         let param:u32 = 0;
-        ets_timer_disarm(& mut UPDATE_TIMER);
         ets_timer_setfn(& mut UPDATE_TIMER, update, &param);
         ets_timer_arm_new(& mut UPDATE_TIMER, 100, 1, 1);
     };
