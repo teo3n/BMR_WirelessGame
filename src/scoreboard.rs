@@ -5,7 +5,11 @@
  * 	14.12.2020
  *
  * 	an easy to use per-controller scoreboard,
- *  requires a strip of ws2812 LEDs to work
+ *  requires a strip of ws2812 LEDs to work.
+ * 
+ *  the constant LED_COUNT must be set,
+ *  takes in also the maximum score. 
+ *  score cannot exceed [0, 255]
  */
 
 
