@@ -38,6 +38,9 @@ pub mod nunchuk;
 pub mod ws2812;
 use ws2812::{ Ws2812, RGB };
 
+pub mod scoreboard;
+use scoreboard::ScoreBoard;
+
 #[entry]
 fn main() -> ! {
     let periph = pac::Peripherals::take().unwrap();
@@ -76,7 +79,7 @@ fn main() -> ! {
     delay.delay_ms(2);
 
     let i2c0 = periph.I2C0;
-    let scl = gpiob.pb8.into_alternate_open_drain();use embedded_hal::digital::v2::OutputPin;
+    let scl = gpiob.pb8.into_alternate_open_drain();
     let sda = gpiob.pb9.into_alternate_open_drain();
     let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
@@ -85,6 +88,11 @@ fn main() -> ! {
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
     let mut ws2 = Ws2812::<_, 3>::new(clock_speed, &mut wspin);
+
+    let mut sboard_pin = gpiob.pb6.into_push_pull_output();
+
+    // second argument is the maximum score
+    let mut sboard = ScoreBoard::new(&mut sboard_pin, 5);
 
     loop
     {
