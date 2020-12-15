@@ -160,7 +160,7 @@ where T: OutputPin
 
                     // this branch should never be reached, but 
                     // compiler nags if it isn't implemented
-                    _ => (),
+                    _ => unreachable!(),
                 }
             }
         }
