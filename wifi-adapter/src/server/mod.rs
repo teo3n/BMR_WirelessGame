@@ -18,10 +18,10 @@ pub struct esp_tcp {
     pub local_port: u32,
     pub local_ip: u32,
     pub remote_ip: u32,
-    pub connect_callback: espconn_connect_callback,
-    pub reconnect_callback: espconn_reconnect_callback,
-    pub disconnect_callback: espconn_connect_callback,
-	pub write_finish_fn: espconn_connect_callback,
+    pub connect_callback: Option<espconn_connect_callback>,
+    pub reconnect_callback: Option<espconn_reconnect_callback>,
+    pub disconnect_callback: Option<espconn_connect_callback>,
+	pub write_finish_fn: Option<espconn_connect_callback>,
 }
 
 #[repr(C)]
@@ -33,8 +33,8 @@ pub struct espconn {
     pub state: u32,
     pub tcp: *mut esp_tcp,        
     /** A callback function that is informed about events for this espconn */
-    pub recv_callback: espconn_recv_callback,
-    pub sent_callback: espconn_sent_callback,
+    pub recv_callback: Option<espconn_recv_callback>,
+    pub sent_callback: Option<espconn_sent_callback>,
     pub ink_cnt: u8,
     pub reverse: *mut u32,
 }
@@ -82,17 +82,17 @@ static mut TCP1: esp_tcp = esp_tcp {
     local_port: 0,
     local_ip: 0,
     remote_ip: 0,
-    connect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
-    reconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_reconnect_callback>(dummy_func) },
-    disconnect_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
-	write_finish_fn: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_connect_callback>(dummy_func) },
+    connect_callback: None,
+    reconnect_callback: None,
+    disconnect_callback: None,
+	write_finish_fn: None,
 };
 static mut CONN: espconn = espconn { 
     conn_type: 0,
     state: 0,
     tcp: unsafe { core::mem::transmute::<u32,*mut esp_tcp>(0) } ,
-    recv_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_recv_callback>(dummy_func) } ,
-    sent_callback: unsafe { core::mem::transmute::<unsafe extern "C" fn(*const u32),espconn_sent_callback>(dummy_func) } ,
+    recv_callback: None ,
+    sent_callback: None,
     ink_cnt: 0,
     reverse: unsafe { core::mem::transmute::<u32,*mut u32>(0) } ,
 };
@@ -100,14 +100,6 @@ static mut CONN: espconn = espconn {
 static mut SEND_BUFFER: [u8; 100usize] = [0;100];
 static mut BUFFER_POS: u16 = 0;
 static mut IN_CONN: * mut espconn = unsafe { core::mem::transmute::<u32,* mut espconn>(0) } ;
-
-// Just so that the rust compiler doesn't complain about null pointers
-// "type validation failed: encountered 0x00000000 at xxx, but expected a function pointer"
-#[no_mangle]
-#[link(name="dummy_func")]
-pub unsafe extern "C" fn dummy_func(arg:*const u32)
-{
-}
 
 #[no_mangle]
 #[link(name="webserver_recv")]
