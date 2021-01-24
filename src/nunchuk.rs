@@ -177,8 +177,8 @@ impl Nunchuk<'_>
 
 		return ControllerInput
 		{
-			joy_x: (buffer[0] as i16 - 127) as i8,
-			joy_y: (buffer[1] as i16 - 127) as i8,
+			joy_x: (buffer[0] as i16 - 128) as i8,
+			joy_y: (buffer[1] as i16 - 128) as i8,
 			accel_x,
 			accel_y,
 			accel_z,
