@@ -41,6 +41,7 @@ pub mod ws2812;
 pub mod gameboard;
 pub mod colors;
 
+pub mod game;
 use gameboard::Gameboard;
 use ws2812::{ Ws2812, RGB };
 
@@ -55,6 +56,7 @@ const Y_LIMIT: usize = 16;
 
 const OLED_DEBUG_SCREEN: bool = false;
 const SERIAL_DEBUG: bool = true;
+const MASTER_DEVICE: bool = true;
 
 #[entry]
 fn main() -> ! {
@@ -115,30 +117,48 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
-    delay.delay_ms(10);
+    let mut tba_objects: [(usize, f32, f32, char); 8] = [
+        (0, 3.536f32, -3.536f32, '*'),
+        (0, -2.868f32, -4.096f32, '#'),
+        (6, -1.710f32, 4.698f32, '*'),
+        (2, -4.728f32, 1.628f32, '#'),
+        (2, 0.436f32, 4.981f32, '#'),
+        (1, 2.868f32, 4.096f32, '*'),
+        (5, -4.193f32, 2.723f32, '#'),
+        (5, 4.830f32, -1.294f32, '*'),
+    ];
 
+    let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
+    let mut number_of_objects: usize = 0;
+    let mut index = 0;
+
+    while tba_objects[index].0 == 0 {
+        let (_, x, y, symbol) = tba_objects[index];
+        objects[number_of_objects] = Some(
+            game::MovingObject::new(game::Vector {
+                x,
+                y,
+            }, symbol));
+        index += 1;
+        number_of_objects += 1;
+    }
+	
+    delay.delay_ms(10);
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
     let mut ws2 = Ws2812::<_, PIXEL_TOTAL_AMOUNT>::new(clock_speed, &mut wspin);
     let mut board = gameboard::Gameboard::<_>::new(&mut ws2);
 
-    // set single pixel
-    board.set_color(0, 8-1, colors::NAVY);
-
-    //set 2 bottom rows with alternating colors
+    // Add borders
     for x in 0..X_LIMIT
     {
-        for y in 0..3
-        {
-            if (y+x) % 2 == 0
-            {
-                board.set_color(x, y, colors::PURPLE);
-            }
-            else
-            {
-                board.set_color(x, y, colors::GREEN);
-            }
-        }
+        board.set_color(x, 0, colors::GREEN);
+        board.set_color(x, Y_LIMIT-1, colors::GREEN);
+    }
+    for y in 0..Y_LIMIT
+    {
+        board.set_color(0, y, colors::GREEN);
+        board.set_color(X_LIMIT-1, y, colors::GREEN);
     }
     //flush board 
     board.flush();
@@ -193,13 +213,63 @@ fn main() -> ! {
         //     {
         //     }
         // }
+
+        //game::print_board();
+
+        game::game_tick(&mut objects, number_of_objects);
+        game::clear_board();
+
+        while index < tba_objects.len() && tba_objects[index].0 == 0 {
+            let (_, x, y, symbol) = tba_objects[index];
+            objects[number_of_objects] = Some(
+                game::MovingObject::new(game::Vector { x, y }, symbol)
+            );
+            index += 1;
+            number_of_objects += 1;
+        }
+
+        let mut moving: bool = false;
+        for i in 0..number_of_objects {
+            let object = match objects[i] {
+                Some(o) => o,
+                None => continue,
+            };
+            unsafe {
+                let pos = object.position();
+                game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
+            }
+            moving |= object.moving();
+        }
+
+        if !moving && (index >= tba_objects.len()) {
+            //break;
+        }
+        if index < tba_objects.len() {
+            tba_objects[index].0 -= 1;
+        }
+
+
+        for y in 1..(game::BOARD_WIDTH - 1) {
+            for x in 1..(game::BOARD_WIDTH - 1) {
+                unsafe {
+                    if game::BOARD[x + y * game::BOARD_WIDTH] != '.' 
+                    {
+                        board.set_color(x, y, colors::NAVY);
+                    } else {
+                        board.set_color(x, y, colors::BLACK);
+                    }
+                }
+            }
+        }
+        
+        /*
         for x in 1..X_LIMIT
         {            
             for y in 0..3
             {
                 board.swap(x,y,x-1,y);
             }
-        }
+        }*/
         board.update_matrix();
         delay.delay_ms(100);
     }
