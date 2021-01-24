@@ -57,6 +57,16 @@ const Y_LIMIT: usize = 16;
 const OLED_DEBUG_SCREEN: bool = false;
 const SERIAL_DEBUG: bool = true;
 const MASTER_DEVICE: bool = true;
+const DEFAULT_TIMEOUT: u8 = 10;
+
+#[derive(Copy, Clone)]
+struct Player {
+    x: f32,
+    y: f32,
+    color: RGB,
+    shoot_timeout: u8,
+    shoot_btn: bool
+}
 
 #[entry]
 fn main() -> ! {
@@ -128,6 +138,10 @@ fn main() -> ! {
         (5, 4.830f32, -1.294f32, '*'),
     ];
 
+    let temp_player = Player { x: 7.5f32, y:1.0f32, color:colors::WHITE, shoot_timeout: 0, shoot_btn: false,};
+    let mut players = [temp_player, temp_player];
+    players[1].y = 14.0f32;
+
     let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
     let mut number_of_objects: usize = 0;
     let mut index = 0;
@@ -168,8 +182,8 @@ fn main() -> ! {
     // second argument is the maximum score
     let mut sboard = ScoreBoard::new(&mut sboard_pin, 5);
 
+    delay.delay_ms(100);
 
-    delay.delay_ms(1000);
     loop
     {
         let input: nunchuk::ControllerInput = nchuck.get_input();
@@ -270,7 +284,51 @@ fn main() -> ! {
                 board.swap(x,y,x-1,y);
             }
         }*/
+        let mut target_x:usize = 0;
+        let mut target_y:usize = 0;
+        let mut use_target = false;
+        let mut original_color: RGB = colors::BLACK;
+
+        if players[0].shoot_timeout > 0
+        {
+            players[0].shoot_timeout = players[0].shoot_timeout-1;
+        } else if players[0].shoot_btn == true { 
+
+            // Shoot on release
+            if input.btn_z == 0 {
+                players[0].shoot_timeout = DEFAULT_TIMEOUT;
+                players[0].shoot_btn = false;
+            }
+            else {
+                // Draw target vector
+                let x_float:f32 = input.joy_x as f32 / 64.0f32;
+                let y_float:f32 = input.joy_y as f32 / 64.0f32;
+                let xpos = (players[0].x + x_float) as i32;
+                let ypos = (players[0].y + y_float) as i32;
+                if xpos > 0 && ypos > 0 && xpos < (X_LIMIT-1) as i32 && ypos < (Y_LIMIT-1) as i32 {
+                    target_x = xpos as usize;
+                    target_y = ypos as usize;
+                    use_target = true;
+                }
+            }
+        } else {
+            if input.btn_z == 1 {
+                players[0].shoot_btn = true;
+            }
+        }
+
+        
+        if use_target == true 
+        {
+            original_color = board.get_color(target_x, target_y);
+            board.set_color(target_x, target_y, colors::RED);
+        }
+
         board.update_matrix();
+        if use_target == true 
+        {
+            board.set_color(target_x, target_y, original_color);
+        }
         delay.delay_ms(100);
     }
 }
