@@ -30,6 +30,7 @@ use gd32vf103xx_hal::gpio::gpiob::{ PB8, PB9, PB5 };
 
 use gd32vf103xx_hal::rcu::RcuExt;
 use gd32vf103xx_hal::delay::McycleDelay;
+use gd32vf103xx_hal::serial::{Serial, Config};
 use embedded_hal::blocking::delay::DelayMs;
 
 pub mod lcd;
@@ -40,6 +41,10 @@ use ws2812::{ Ws2812, RGB };
 
 pub mod scoreboard;
 use scoreboard::ScoreBoard;
+
+// Configuration
+const OLED_DEBUG_SCREEN: bool = false;
+const SERIAL_DEBUG: bool = true;
 
 #[entry]
 fn main() -> ! {
@@ -60,16 +65,33 @@ fn main() -> ! {
     let mut afio = periph.AFIO.constrain(&mut rcu);
     let mut delay = McycleDelay::new(&rcu.clocks);
 
+    let serial = Serial::new(
+        periph.USART0,
+        (gpioa.pa9, gpioa.pa10),
+        Config::default().baudrate(115200.bps()),
+        &mut afio,
+        &mut rcu,
+    );
+
+    let (mut tx, mut rx) = serial.split();
+
+    if SERIAL_DEBUG == true
+    {
+        write!(tx,"Starting..\r\n");
+    }
+
     let lcd_pins = lcd_pins!(gpioa, gpiob);
     let mut lcd = lcd::configure(periph.SPI0, lcd_pins, &mut afio, &mut rcu);
     let (width, height) = (lcd.size().width as i32, lcd.size().height as i32);
 
-    // clear the screen
-    Rectangle::new(Point::new(0, 0), Point::new(width - 1, height - 1))
-        .into_styled(primitive_style!(fill_color = Rgb565::BLACK))
-        .draw(&mut lcd)
-        .unwrap();
-
+    if OLED_DEBUG_SCREEN == true
+    {
+        // clear the screen
+        Rectangle::new(Point::new(0, 0), Point::new(width - 1, height - 1))
+            .into_styled(primitive_style!(fill_color = Rgb565::BLACK))
+            .draw(&mut lcd)
+            .unwrap();
+    }
     let style = text_style!(
         font = Font6x8,
         text_color = Rgb565::BLACK,
@@ -98,29 +120,37 @@ fn main() -> ! {
     {
         let input: nunchuk::ControllerInput = nchuck.get_input();
 
-        // print out the joystick values
-        let mut display_buffer_joy = ArrayString::<[_; 26]>::new();
-        write!(&mut display_buffer_joy, "joy_x: {}: joy_y: {}  ", input.joy_x, input.joy_y).expect("failed to create buffer");
-        Text::new(&display_buffer_joy, Point::new(10, 10))
-            .into_styled(style)
-            .draw(&mut lcd).unwrap();
-
-        // print out the button states
-        let mut display_buffer_btn = ArrayString::<[_; 26]>::new();
-        write!(&mut display_buffer_btn, "btn_z: {}: btn_c: {}  ", input.btn_z, input.btn_c).expect("failed to create buffer");
-        Text::new(&display_buffer_btn, Point::new(10, 30))
-            .into_styled(style)
-            .draw(&mut lcd).unwrap();
-
-        // print out the accelerometer values
-        let mut display_buffer_accel = ArrayString::<[_; 26]>::new();
-        write!(&mut display_buffer_accel, "az: {}: ay: {} az: {}  ", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
-        Text::new(&display_buffer_accel, Point::new(10, 50))
-            .into_styled(style)
-            .draw(&mut lcd).unwrap();
-
-        for i in 0..ws2.get_led_count()
+        if OLED_DEBUG_SCREEN == true
         {
+            // print out the joystick values
+            let mut display_buffer_joy = ArrayString::<[_; 26]>::new();
+            write!(&mut display_buffer_joy, "joy_x: {}: joy_y: {}  ", input.joy_x, input.joy_y).expect("failed to create buffer");
+            Text::new(&display_buffer_joy, Point::new(10, 10))
+                .into_styled(style)
+                .draw(&mut lcd).unwrap();
+
+            // print out the button states
+            let mut display_buffer_btn = ArrayString::<[_; 26]>::new();
+            write!(&mut display_buffer_btn, "btn_z: {}: btn_c: {}  ", input.btn_z, input.btn_c).expect("failed to create buffer");
+            Text::new(&display_buffer_btn, Point::new(10, 30))
+                .into_styled(style)
+                .draw(&mut lcd).unwrap();
+
+            // print out the accelerometer values
+            let mut display_buffer_accel = ArrayString::<[_; 26]>::new();
+            write!(&mut display_buffer_accel, "az: {}: ay: {} az: {}  ", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
+            Text::new(&display_buffer_accel, Point::new(10, 50))
+                .into_styled(style)
+                .draw(&mut lcd).unwrap();
+        }
+        if SERIAL_DEBUG == true
+        {
+            write!(tx,"joy_x: {}: joy_y: {}  \r\n", input.joy_x, input.joy_y).expect("failed to create buffer");
+            write!(tx,"btn_z: {}: btn_c: {}  \r\n", input.btn_z, input.btn_c).expect("failed to create buffer");
+            //write!(tx,"az: {}: ay: {} az: {}  \r\n", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
+        }
+        for i in 0..ws2.get_led_count()
+        {            
             if input.btn_z == 1
             {
                 ws2.set_color(RGB { r: 255 as u8, g: 0 as u8, b: 0}, i);
