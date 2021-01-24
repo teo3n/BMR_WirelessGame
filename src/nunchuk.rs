@@ -94,7 +94,10 @@ impl Nunchuk<'_>
 	/// initializes the nunchuk internal registers
 	fn init_nunchuk(&mut self)
 	{
-		self.i2c_handle.write(0x52, &[0x40, 0x00]).unwrap();
+		//self.i2c_handle.write(0x52, &[0x40, 0x00]).unwrap(); //Encrypted output
+		// Init with encryption disabled
+		self.i2c_handle.write(0x52, &[0xF0, 0x55]).unwrap();
+		self.i2c_handle.write(0x52, &[0xFB, 0x00]).unwrap();
 	}
 
 	/// reads 6 bytes from the nunchuk and then
@@ -105,12 +108,15 @@ impl Nunchuk<'_>
         self.i2c_handle.read(0x52, &mut read_buffer).unwrap();
 
         // xor the entire buffer element wise by 0.17.
-        // why? I don't think even nintendo knows
+		// why? I don't think even nintendo knows
+		// Disabled encryption -Marko
+		/*
         for i in 0..6
         {
         	let current_byte = read_buffer[i];
         	read_buffer[i] = (current_byte ^ 0x17) + 0x17
-        }
+		}
+		*/
 
         let mut delay = McycleDelay::new(&self.rcu.clocks);
     	delay.delay_us(100);
