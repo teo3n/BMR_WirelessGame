@@ -106,7 +106,7 @@ where T: OutputPin
         let buffer: [RGB; N] = [ RGB::zero(); N];
         // get the system clock speed
 
-        let mut ws = Ws2812
+        let ws = Ws2812
         {
             data_pin,
             data_buffer: buffer,

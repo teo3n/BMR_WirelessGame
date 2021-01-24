@@ -35,14 +35,24 @@ use embedded_hal::blocking::delay::DelayMs;
 
 pub mod lcd;
 use riscv_rt::entry;
+
 pub mod nunchuk;
 pub mod ws2812;
+pub mod gameboard;
+pub mod colors;
+
+use gameboard::Gameboard;
 use ws2812::{ Ws2812, RGB };
+
 
 pub mod scoreboard;
 use scoreboard::ScoreBoard;
 
 // Configuration
+const PIXEL_TOTAL_AMOUNT: usize = 256;
+const X_LIMIT: usize = 16;
+const Y_LIMIT: usize = 16;
+
 const OLED_DEBUG_SCREEN: bool = false;
 const SERIAL_DEBUG: bool = true;
 
@@ -77,7 +87,7 @@ fn main() -> ! {
 
     if SERIAL_DEBUG == true
     {
-        write!(tx,"Starting..\r\n");
+        write!(tx,"Starting..\r\n").expect("failed to create buffer");
     }
 
     let lcd_pins = lcd_pins!(gpioa, gpiob);
@@ -109,13 +119,37 @@ fn main() -> ! {
 
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
-    let mut ws2 = Ws2812::<_, 3>::new(clock_speed, &mut wspin);
+    let mut ws2 = Ws2812::<_, PIXEL_TOTAL_AMOUNT>::new(clock_speed, &mut wspin);
+    let mut board = gameboard::Gameboard::<_>::new(&mut ws2);
+
+    // set single pixel
+    board.set_color(0, 8-1, colors::NAVY);
+
+    //set 2 bottom rows with alternating colors
+    for x in 0..X_LIMIT
+    {
+        for y in 0..3
+        {
+            if (y+x) % 2 == 0
+            {
+                board.set_color(x, y, colors::PURPLE);
+            }
+            else
+            {
+                board.set_color(x, y, colors::GREEN);
+            }
+        }
+    }
+    //flush board 
+    board.flush();
 
     let mut sboard_pin = gpiob.pb6.into_push_pull_output();
 
     // second argument is the maximum score
     let mut sboard = ScoreBoard::new(&mut sboard_pin, 5);
 
+
+    delay.delay_ms(1000);
     loop
     {
         let input: nunchuk::ControllerInput = nchuck.get_input();
@@ -149,20 +183,24 @@ fn main() -> ! {
             write!(tx,"btn_z: {}: btn_c: {}  \r\n", input.btn_z, input.btn_c).expect("failed to create buffer");
             //write!(tx,"az: {}: ay: {} az: {}  \r\n", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
         }
-        for i in 0..ws2.get_led_count()
+        // for i in 0..ws2.get_led_count()
+        // {
+        //     if input.btn_z == 1
+        //     {
+        //         ws2.set_color(RGB { r: 255 as u8, g: 0 as u8, b: 0}, i);
+        //     }
+        //     else
+        //     {
+        //     }
+        // }
+        for x in 1..X_LIMIT
         {            
-            if input.btn_z == 1
+            for y in 0..3
             {
-                ws2.set_color(RGB { r: 255 as u8, g: 0 as u8, b: 0}, i);
-            }
-            else
-            {
-                ws2.set_color(RGB { r: 0 as u8, g: 255 as u8, b: 0}, i);
+                board.swap(x,y,x-1,y);
             }
         }
-        
-
-        ws2.write_leds();
-        delay.delay_ms(1);
+        board.update_matrix();
+        delay.delay_ms(100);
     }
 }
