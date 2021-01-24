@@ -63,6 +63,20 @@ where T: OutputPin
             //Ok(true)
         }
     }
+    pub fn get_color(&mut self, x : usize, y : usize) -> RGB
+    {
+        let g_board_width = self.matrix.len();
+        let g_board_height = self.matrix[0].len();
+        if x >= g_board_width || y >= g_board_height
+        {
+            //Err("Coords out of range")
+        }
+        else
+        {
+            return self.matrix[x][y];
+        }
+        return RGB { r: 0x00, g: 0x00, b: 0x00 };
+    }
 
     // Empties screen entirely and draws new data to it.
     pub fn flush(&mut self)
