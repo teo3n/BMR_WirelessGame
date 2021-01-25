@@ -218,43 +218,38 @@ fn main() -> ! {
         game::clear_board();
 
         let mut moving: bool = false;
-        if number_of_objects > 0 
-        {
-            for i in 0..number_of_objects {
-                let object = match objects[i] {
-                    Some(o) => o,
-                    None => continue,
-                };
-                if object.symbol == '.'
+        for i in 0..number_of_objects {
+            let mut object = match objects[i] {
+                Some(o) => o,
+                None => continue,
+            };
+
+            let pos = object.position();
+            
+            if object.moving() == false || object.get_age() > 100 {
+                // "Explode" objects that have stopped
+                for obj_x in pos.0-2..=pos.0+2
                 {
-                    continue;
-                }
-                let pos = object.position();
-                
-                if object.moving() == false {
-                    // "Explode" objects that have stopped
-                    for obj_x in pos.0-3..pos.0+3
+                    for obj_y in pos.1-2..=pos.1+2
                     {
-                        for obj_y in pos.1-3..pos.1+3
+                        if obj_x > 0 && obj_x < (game::BOARD_WIDTH - 2) &&
+                            obj_y > 0 && obj_y < (game::BOARD_WIDTH - 2)
                         {
-                            if obj_x > 0 && obj_x < (game::BOARD_WIDTH - 1) &&
-                                obj_y > 0 && obj_y < (game::BOARD_WIDTH - 1)
+                            if object.symbol == '*'
                             {
-                                if object.symbol == '*'
-                                {
-                                    board.set_color(obj_x, obj_y, players[0].color);
-                                } else {
-                                    board.set_color(obj_x, obj_y, players[1].color);
-                                }
+                                board.set_color(obj_x, obj_y, players[0].color);
+                            } else {
+                                board.set_color(obj_x, obj_y, players[1].color);
                             }
                         }
                     }
-                    objects[i].unwrap().clear_symbol();
-                } else {
-                    unsafe {                    
-                        game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
-                    }
                 }
+                objects[i] = None;
+            } else {
+                unsafe {                    
+                    game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
+                }
+                object.add_age();
             }
         }
 
@@ -270,125 +265,126 @@ fn main() -> ! {
             }
         }
 
-        if players[0].shoot_timeout > 0
+        for i in 0..=1 
         {
-            players[0].shoot_timeout = players[0].shoot_timeout-1;
-        } else if players[0].shoot_btn == true { 
+            if players[i].shoot_timeout > 0
+            {
+                players[i].shoot_timeout = players[i].shoot_timeout-1;
+            } else if players[i].shoot_btn == true { 
 
-            // Calculate target direction
-            let x_float:f32 = input.joy_x as f32;
-            let y_float:f32 = input.joy_y as f32;
-            let len:f32 = game::fast_sqrt(game::pow2(game::abs(x_float)) + game::pow2(game::abs(y_float)));
+                // Calculate target direction
+                let x_float:f32 = input.joy_x as f32;
+                let y_float:f32 = input.joy_y as f32;
+                let len:f32 = game::fast_sqrt(game::pow2(game::abs(x_float)) + game::pow2(game::abs(y_float)));
 
 
-            // Shoot on release
-            if input.btn_z == 0 {
-                players[0].shoot_timeout = DEFAULT_TIMEOUT;
-                players[0].shoot_btn = false;
-                players[0].use_target = false;
+                // Shoot on release
+                if input.btn_z == 0 {
+                    players[i].shoot_timeout = DEFAULT_TIMEOUT;
+                    players[i].shoot_btn = false;
+                    players[i].use_target = false;
 
-                let xpos = players[0].x as f32;
-                let ypos = players[0].y as f32;
+                    let xpos = players[i].x;
+                    let ypos = players[i].y - 0.5f32;
 
-                let xdir = (x_float / len) * 2.0f32;
-                let ydir = (y_float / len) * 2.0f32;
+                    let xdir = (x_float / len) * 2.0f32;
+                    let ydir = (y_float / len) * 2.0f32;
 
-                for i in 0..(game::MAXIMUM_OBJECTS - 1) {
+                    for ii in 0..(game::MAXIMUM_OBJECTS - 1) {
 
-                    if objects[i].is_none() || objects[i].unwrap().symbol == '.' {
-                        let object = game::MovingObject::new(
-                                game::Vector { x: xpos, y: ypos },
-                                game::Vector { x: xdir, y: ydir },
-                                    '*');
-                        objects[i] = Some(object);                        
-                        if i + 1 > number_of_objects
-                        {
-                            number_of_objects = i + 1;
+                        if objects[ii].is_none() || objects[ii].unwrap().symbol == '.' {
+                            let mut symbol = '*';
+                            if i == 1
+                            {
+                                symbol = '#';
+                            }
+                            let object = game::MovingObject::new(
+                                    game::Vector { x: xpos, y: ypos },
+                                    game::Vector { x: xdir, y: ydir },
+                                    symbol);
+                            objects[ii] = Some(object);                        
+                            if ii + 1 > number_of_objects
+                            {
+                                number_of_objects = ii + 1;
+                            }
+                            break;
                         }
-                        break;
+                    }
+
+                }
+                else {
+                    // Draw target vector
+                    let xpos = (players[i].x + (x_float / len) * 3.0f32 ) as i32;
+                    let ypos = (players[i].y + (y_float / len) * 3.0f32 ) as i32;
+
+                    if xpos > 0 && ypos > 0 && xpos < (X_LIMIT-1) as i32 && ypos < (Y_LIMIT-1) as i32 {
+                        players[i].target_x = xpos as usize;
+                        players[i].target_y = ypos as usize;
+                        players[i].use_target = true;
                     }
                 }
-
-            }
-            else {
-                // Draw target vector
-                let xpos = (players[0].x + (x_float / len) * 3.0f32 ) as i32;
-                let ypos = (players[0].y + (y_float / len) * 3.0f32 ) as i32;
-
-                if xpos > 0 && ypos > 0 && xpos < (X_LIMIT-1) as i32 && ypos < (Y_LIMIT-1) as i32 {
-                    players[0].target_x = xpos as usize;
-                    players[0].target_y = ypos as usize;
-                    players[0].use_target = true;
-                }
-            }
-        } else {
-            if input.btn_z == 1 {
-                players[0].shoot_btn = true;
-            } else if input.joy_x > 100 || input.joy_x < -100 || input.joy_y > 100 || input.joy_y < -100 {
-                // Move player
-                let mut moved:bool = false;
-                let mut x_dir:i8 = 0;
-                let mut y_dir:i8 = 0;
-                if input.joy_x > 100 {
-                    x_dir = 1;
-                } else if input.joy_x < -100 {
-                    x_dir = -1;
-                }
-                if input.joy_y > 100 {
-                    y_dir = 1;
-                } else if input.joy_y < -100 {
-                    y_dir = -1;
-                }
-
-                if x_dir != 0 || y_dir != 0 {
-                    moved = true;
-                    if (players[0].x as usize) > 0 && (players[0].x as usize) < (X_LIMIT-1) 
-                    {
-                        players[0].x += x_dir as f32;
+            } else {
+                if input.btn_z == 1 {
+                    players[i].shoot_btn = true;
+                } else if input.joy_x > 100 || input.joy_x < -100 || input.joy_y > 100 || input.joy_y < -100 {
+                    // Move player
+                    let mut moved:bool = false;
+                    let mut x_dir:i8 = 0;
+                    let mut y_dir:i8 = 0;
+                    if input.joy_x > 100 {
+                        x_dir = 1;
+                    } else if input.joy_x < -100 {
+                        x_dir = -1;
                     }
-                    if (players[0].y as usize) > 0 && (players[0].y as usize) < (Y_LIMIT-1) 
-                    {
-                        players[0].y += y_dir as f32;
+                    if input.joy_y > 100 {
+                        y_dir = 1;
+                    } else if input.joy_y < -100 {
+                        y_dir = -1;
                     }
-                }
-                
-                if moved == true {
-                    players[0].shoot_timeout = DEFAULT_TIMEOUT>>1;
-                }
 
+                    if x_dir != 0 || y_dir != 0 {
+                        moved = true;
+                        if (players[i].x as i8)+x_dir > 0 && (players[i].x as i8)+x_dir < (X_LIMIT-1) as i8
+                        {
+                            players[i].x += x_dir as f32;
+                        }
+                        if (players[i].y as i8)+y_dir > 0 && (players[i].y as i8)+y_dir < (Y_LIMIT-1)  as i8
+                        {
+                            players[i].y += y_dir as f32;
+                        }
+                    }
+                    
+                    if moved == true {
+                        players[i].shoot_timeout = DEFAULT_TIMEOUT>>1;
+                    }
+
+                }
             }
-        }
-        
-        if players[0].use_target == true 
-        {
-            board.set_color_in_buffer(players[0].target_x, players[0].target_y, colors::RED);
-        }
-
-        for i in 0..1 
-        {
+            
+            if players[i].use_target == true 
+            {
+                board.set_color_in_buffer(players[i].target_x, players[i].target_y, colors::RED);
+            }
             board.set_color_in_buffer(players[i].x as usize, players[i].y as usize, colors::YELLOW);
         }
 
         board.update_matrix();
         board.flush_to_buffer();
 
-
-        if number_of_objects > 0 
-        {
-            for i in 0..number_of_objects {
-                let object = match objects[i] {
-                    Some(o) => o,
-                    None => continue,
-                };
-                let pos = object.position();
-                if object.symbol == '*'
-                {
-                    board.set_color(pos.0 as usize, pos.1 as usize, players[0].color);
-                } else {
-                    board.set_color(pos.0 as usize, pos.1 as usize, players[1].color);
-                }                    
-            }
+        for i in 0..number_of_objects {
+            let object = match objects[i] {
+                Some(o) => o,
+                None => continue,
+            };
+            let pos = object.position();
+            if object.symbol == '*'
+            {
+                board.set_color(pos.0 as usize, pos.1 as usize, players[0].color);
+            } else {
+                board.set_color(pos.0 as usize, pos.1 as usize, players[1].color);
+            }                    
         }
+
 
         // ToDo: Calculate score
 

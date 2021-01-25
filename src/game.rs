@@ -73,6 +73,7 @@ pub struct MovingObject {
     location: Vector,
     ratios: Vector,
     pub(crate) symbol: char,
+    age: usize,
 }
 
 impl MovingObject {
@@ -86,6 +87,7 @@ impl MovingObject {
                 location,
                 symbol,
                 ratios: temp,
+                age: 0,
             }
         } else {
             MovingObject {
@@ -93,6 +95,7 @@ impl MovingObject {
                 location,
                 symbol,
                 ratios: Vector { x: 0.5f32 / sum, y: 0.5f32 },
+                age: 0,
             }
         }
     }
@@ -166,7 +169,7 @@ impl MovingObject {
                 Some(o) => o,
                 None => continue
             };
-            if (!self.moving() && !other.moving()) || other.symbol == '.' {
+            if !self.moving() && !other.moving() {
                 continue;
             }
             let collision_time = find_collision_times(
@@ -190,6 +193,12 @@ impl MovingObject {
     pub fn clear_symbol(&mut self)  {
         self.symbol = '.';
     }
+    pub fn add_age(&mut self)  {
+        self.age = self.age + 1;
+    }
+    pub fn get_age(self) -> usize {
+        self.age
+    }
 }
 
 pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: usize) {
@@ -201,11 +210,8 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
         for i in 0..number_of_objects {
             let ob = match objects[i] {
                 Some(o) => o,
-                None => panic!()
+                None => continue,
             };
-            if ob.symbol == '.' {
-                continue;
-            }
             let temp = ob.get_collisions(*objects, i, 1f32 - tick_so_far);
             for i in 0..MAX_COLLISIONS_PER_OBJECT {
                 match temp[i] {
