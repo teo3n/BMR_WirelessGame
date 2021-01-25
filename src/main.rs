@@ -132,17 +132,6 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
-    let mut tba_objects: [(usize, f32, f32, char); 8] = [
-        (0, 3.536f32, -3.536f32, '*'),
-        (0, -2.868f32, -4.096f32, '#'),
-        (6, -1.710f32, 4.698f32, '*'),
-        (2, -4.728f32, 1.628f32, '#'),
-        (2, 0.436f32, 4.981f32, '#'),
-        (1, 2.868f32, 4.096f32, '*'),
-        (5, -4.193f32, 2.723f32, '#'),
-        (5, 4.830f32, -1.294f32, '*'),
-    ];
-
     let temp_player = Player { x: 7.0f32, y:1.0f32, 
         color:colors::PURPLE,
         color_under:colors::BLACK,
@@ -161,19 +150,6 @@ fn main() -> ! {
     let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
     let mut number_of_objects: usize = 0;
     let mut index = 0;
-
-    /*
-    while tba_objects[index].0 == 0 {
-        let (_, x, y, symbol) = tba_objects[index];
-        objects[number_of_objects] = Some(
-            game::MovingObject::new(game::Vector {
-                x,
-                y,
-            }, symbol));
-        index += 1;
-        number_of_objects += 1;
-    }
-    */
 	
     delay.delay_ms(10);
 
@@ -249,6 +225,10 @@ fn main() -> ! {
                     Some(o) => o,
                     None => continue,
                 };
+                if object.symbol == '.'
+                {
+                    continue;
+                }
                 let pos = object.position();
                 
                 if object.moving() == false {
@@ -269,7 +249,7 @@ fn main() -> ! {
                             }
                         }
                     }
-                    objects[i] = None;
+                    objects[i].unwrap().clear_symbol();
                 } else {
                     unsafe {                    
                         game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
@@ -284,7 +264,7 @@ fn main() -> ! {
                 unsafe {
                     if game::BOARD[x + y * game::BOARD_WIDTH] != '.' 
                     {
-                        board.set_color(x, y, colors::NAVY);
+                        board.set_color_in_buffer(x, y, colors::NAVY);
                     }
                 }
             }
@@ -305,6 +285,7 @@ fn main() -> ! {
             if input.btn_z == 0 {
                 players[0].shoot_timeout = DEFAULT_TIMEOUT;
                 players[0].shoot_btn = false;
+                players[0].use_target = false;
 
                 let xpos = players[0].x as f32;
                 let ypos = players[0].y as f32;
@@ -314,7 +295,7 @@ fn main() -> ! {
 
                 for i in 0..(game::MAXIMUM_OBJECTS - 1) {
 
-                    if objects[i].is_none() {                       
+                    if objects[i].is_none() || objects[i].unwrap().symbol == '.' {
                         let object = game::MovingObject::new(
                                 game::Vector { x: xpos, y: ypos },
                                 game::Vector { x: xdir, y: ydir },
@@ -361,8 +342,14 @@ fn main() -> ! {
 
                 if x_dir != 0 || y_dir != 0 {
                     moved = true;
-                    players[0].x += x_dir as f32;
-                    players[0].y += y_dir as f32;
+                    if (players[0].x as usize) > 0 && (players[0].x as usize) < (X_LIMIT-1) 
+                    {
+                        players[0].x += x_dir as f32;
+                    }
+                    if (players[0].y as usize) > 0 && (players[0].y as usize) < (Y_LIMIT-1) 
+                    {
+                        players[0].y += y_dir as f32;
+                    }
                 }
                 
                 if moved == true {
@@ -374,26 +361,17 @@ fn main() -> ! {
         
         if players[0].use_target == true 
         {
-            players[0].target_original_color = board.get_color(players[0].target_x, players[0].target_y);
-            board.set_color(players[0].target_x, players[0].target_y, colors::RED);
+            board.set_color_in_buffer(players[0].target_x, players[0].target_y, colors::RED);
         }
 
         for i in 0..1 
         {
-            players[i].color_under = board.get_color(players[i].x as usize, players[i].y as usize);
-            board.set_color(players[i].x as usize, players[i].y as usize, colors::YELLOW);
+            board.set_color_in_buffer(players[i].x as usize, players[i].y as usize, colors::YELLOW);
         }
 
         board.update_matrix();
+        board.flush_to_buffer();
 
-        if players[0].use_target == true 
-        {
-            board.set_color(players[0].target_x, players[0].target_y, players[0].target_original_color);
-        }
-        for i in 0..1 
-        {
-            board.set_color(players[i].x as usize, players[i].y as usize, players[i].color_under);            
-        }
 
         if number_of_objects > 0 
         {
