@@ -166,7 +166,7 @@ impl MovingObject {
                 Some(o) => o,
                 None => continue
             };
-            if !self.moving() && !other.moving() {
+            if (!self.moving() && !other.moving()) || other.symbol == '.' {
                 continue;
             }
             let collision_time = find_collision_times(
@@ -187,6 +187,9 @@ impl MovingObject {
     pub fn moving(self) -> bool {
         return self.velocity.x != 0f32 || self.velocity.y != 0f32;
     }
+    pub fn clear_symbol(&mut self)  {
+        self.symbol = '.';
+    }
 }
 
 pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: usize) {
@@ -200,6 +203,9 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
                 Some(o) => o,
                 None => panic!()
             };
+            if ob.symbol == '.' {
+                continue;
+            }
             let temp = ob.get_collisions(*objects, i, 1f32 - tick_so_far);
             for i in 0..MAX_COLLISIONS_PER_OBJECT {
                 match temp[i] {
