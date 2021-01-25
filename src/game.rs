@@ -5,7 +5,7 @@ const BOARD_INSIDE: usize = BOARD_WIDTH - 3;
 
 pub static mut BOARD: [char; BOARD_SIZE] = ['X'; BOARD_SIZE];
 
-const DECELERATION: f32 = -0.05f32;
+const DECELERATION: f32 = -0.08f32;
 
 pub const MAXIMUM_OBJECTS: usize = 10;
 const MAX_COLLISIONS_PER_OBJECT: usize = 10;
