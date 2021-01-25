@@ -5,7 +5,7 @@ const BOARD_INSIDE: usize = BOARD_WIDTH - 3;
 
 pub static mut BOARD: [char; BOARD_SIZE] = ['X'; BOARD_SIZE];
 
-const DECELERATION: f32 = -0.1f32;
+const DECELERATION: f32 = -0.05f32;
 
 pub const MAXIMUM_OBJECTS: usize = 10;
 const MAX_COLLISIONS_PER_OBJECT: usize = 10;
@@ -76,8 +76,8 @@ pub struct MovingObject {
 }
 
 impl MovingObject {
-    pub fn new(starting_velocity: Vector, symbol: char) -> MovingObject {
-        let location = Vector { x: (BOARD_INSIDE as f32) / 2f32, y: (BOARD_INSIDE as f32) / 2f32 };
+    pub fn new(starting_location: Vector, starting_velocity: Vector, symbol: char) -> MovingObject {
+        let location = starting_location;
         let sum = abs(starting_velocity.x) + abs(starting_velocity.y);
         if sum != 0f32 {
             let temp = Vector { x: abs(starting_velocity.x) / sum, y: abs(starting_velocity.y) / sum };
@@ -350,7 +350,7 @@ union MyUnion {
     f2: f32,
 }
 
-fn fast_sqrt(num: f32) -> f32 {
+pub fn fast_sqrt(num: f32) -> f32 {
     let x2 = num * 0.5f32;
     let threehalfs = 1.5f32;
 
@@ -363,7 +363,7 @@ fn fast_sqrt(num: f32) -> f32 {
     }
 }
 
-fn abs(num: f32) -> f32 {
+pub fn abs(num: f32) -> f32 {
     let mut conv = MyUnion { f2: num };
     unsafe {
         conv.f1 &= 0x7fffffff;
@@ -371,7 +371,7 @@ fn abs(num: f32) -> f32 {
     }
 }
 
-fn pow2(num: f32) -> f32 {
+pub fn pow2(num: f32) -> f32 {
     num * num
 }
 
