@@ -97,6 +97,17 @@ where T: OutputPin
         self.update_matrix();
     }
 
+    pub fn flush_to_buffer(&mut self)
+    {
+        for y in 0..HEIGHT
+        {
+            for x in 0..WIDTH
+            {
+                self.set_color_in_buffer(x,y,self.matrix[x][y]);
+            }
+        }
+    }
+
     // TODO call this function with interrupt to provide appropriate 
     // refresh rate for the screen
     pub fn update_matrix(&mut self)
@@ -105,7 +116,7 @@ where T: OutputPin
     }
     // private methods
 
-    fn set_color_in_buffer(&mut self, x: usize, y : usize, new_color : RGB)
+    pub fn set_color_in_buffer(&mut self, x: usize, y : usize, new_color : RGB)
     {
         let mut index: u32 = 0;
         match y % 2 
