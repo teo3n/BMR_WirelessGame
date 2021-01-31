@@ -55,8 +55,8 @@ const X_LIMIT: usize = 16;
 const Y_LIMIT: usize = 16;
 
 const OLED_DEBUG_SCREEN: bool = false;
-const SERIAL_DEBUG: bool = true;
-const MASTER_DEVICE: bool = true;
+const SERIAL_DEBUG: bool = false;
+const MASTER_DEVICE: bool = false;
 const DEFAULT_TIMEOUT: u8 = 10;
 
 #[derive(Copy, Clone)]
@@ -71,6 +71,7 @@ struct Player {
     target_y:usize,
     use_target: bool,
     target_original_color: RGB,
+    input: nunchuk::ControllerInput,
 }
 
 #[entry]
@@ -95,7 +96,7 @@ fn main() -> ! {
     let serial = Serial::new(
         periph.USART0,
         (gpioa.pa9, gpioa.pa10),
-        Config::default().baudrate(115200.bps()),
+        Config::default().baudrate(74880.bps()),
         &mut afio,
         &mut rcu,
     );
@@ -140,7 +141,8 @@ fn main() -> ! {
         target_x: 0,
         target_y: 0,
         use_target: false,
-        target_original_color: colors::BLACK
+        target_original_color: colors::BLACK,
+        input: nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0},
     };
     let mut players = [temp_player, temp_player];
     players[1].y = 14.0f32;
@@ -180,7 +182,8 @@ fn main() -> ! {
 
     loop
     {
-        let input: nunchuk::ControllerInput = nchuck.get_input();
+        players[0].input = nchuck.get_input();
+        let mut input = players[0].input;
 
         if OLED_DEBUG_SCREEN == true
         {
@@ -212,177 +215,188 @@ fn main() -> ! {
             //write!(tx,"az: {}: ay: {} az: {}  \r\n", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
         }
 
-        if number_of_objects > 0 {
-            game::game_tick(&mut objects, number_of_objects);
-        }
-        game::clear_board();
+        if MASTER_DEVICE == true {
 
-        let mut moving: bool = false;
-        for i in 0..number_of_objects {
-            let mut object = match objects[i] {
-                Some(o) => o,
-                None => continue,
-            };
-
-            let pos = object.position();
             
-            if object.moving() == false || object.get_age() > 100 {
-                // "Explode" objects that have stopped
-                for obj_x in pos.0-2..=pos.0+2
+            if number_of_objects > 0 {
+                game::game_tick(&mut objects, number_of_objects);
+            }
+            game::clear_board();
+
+            let mut moving: bool = false;
+            for i in 0..number_of_objects {
+                let mut object = match objects[i] {
+                    Some(o) => o,
+                    None => continue,
+                };
+
+                let pos = object.position();
+                
+                if object.moving() == false || object.get_age() > 100 {
+                    // "Explode" objects that have stopped
+                    for obj_x in pos.0-2..=pos.0+2
+                    {
+                        for obj_y in pos.1-2..=pos.1+2
+                        {
+                            if obj_x > 0 && obj_x < (game::BOARD_WIDTH - 1) &&
+                                obj_y > 0 && obj_y < (game::BOARD_WIDTH - 1)
+                            {
+                                if object.symbol == '*'
+                                {
+                                    board.set_color(obj_x, obj_y, players[0].color);
+                                } else {
+                                    board.set_color(obj_x, obj_y, players[1].color);
+                                }
+                            }
+                        }
+                    }
+                    objects[i] = None;
+                } else {
+                    if pos.0 < 1 || pos.1 < 1 || pos.0 > game::BOARD_WIDTH - 1 || pos.1 > game::BOARD_WIDTH - 1 {
+                        // ToDo: do something with out-of-bounds object
+                    } else {
+                        unsafe {                    
+                            game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
+                        }
+                        object.add_age();
+                    }
+                }
+            }
+
+            // Game processing done, parse through the list to find object positions
+            for y in 1..(game::BOARD_WIDTH - 1) {
+                for x in 1..(game::BOARD_WIDTH - 1) {
+                    unsafe {
+                        if game::BOARD[x + y * game::BOARD_WIDTH] != '.' 
+                        {
+                            board.set_color_in_buffer(x, y, colors::NAVY);
+                        }
+                    }
+                }
+            }
+
+            for i in 0..=1 
+            {
+                input = players[i].input;
+                if players[i].shoot_timeout > 0
                 {
-                    for obj_y in pos.1-2..=pos.1+2
-                    {
-                        if obj_x > 0 && obj_x < (game::BOARD_WIDTH - 2) &&
-                            obj_y > 0 && obj_y < (game::BOARD_WIDTH - 2)
-                        {
-                            if object.symbol == '*'
-                            {
-                                board.set_color(obj_x, obj_y, players[0].color);
-                            } else {
-                                board.set_color(obj_x, obj_y, players[1].color);
+                    players[i].shoot_timeout = players[i].shoot_timeout-1;
+                } else if players[i].shoot_btn == true { 
+
+                    // Calculate target direction
+                    let x_float:f32 = input.joy_x as f32;
+                    let y_float:f32 = input.joy_y as f32;
+                    let len:f32 = game::fast_sqrt(game::pow2(game::abs(x_float)) + game::pow2(game::abs(y_float)));
+
+
+                    // Shoot on release
+                    if input.btn_z == 0 {
+                        players[i].shoot_timeout = DEFAULT_TIMEOUT;
+                        players[i].shoot_btn = false;
+                        players[i].use_target = false;
+
+                        let xpos = players[i].x;
+                        let ypos = players[i].y - 0.5f32;
+
+                        let xdir = (x_float / len) * 2.0f32;
+                        let ydir = (y_float / len) * 2.0f32;
+
+                        for ii in 0..(game::MAXIMUM_OBJECTS - 1) {
+
+                            if objects[ii].is_none() || objects[ii].unwrap().symbol == '.' {
+                                let mut symbol = '*';
+                                if i == 1
+                                {
+                                    symbol = '#';
+                                }
+                                let object = game::MovingObject::new(
+                                        game::Vector { x: xpos, y: ypos },
+                                        game::Vector { x: xdir, y: ydir },
+                                        symbol);
+                                objects[ii] = Some(object);                        
+                                if ii + 1 > number_of_objects
+                                {
+                                    number_of_objects = ii + 1;
+                                }
+                                break;
                             }
                         }
+
                     }
-                }
-                objects[i] = None;
-            } else {
-                unsafe {                    
-                    game::BOARD[pos.0 + pos.1 * game::BOARD_WIDTH] = object.symbol;
-                }
-                object.add_age();
-            }
-        }
+                    else {
+                        // Draw target vector
+                        let xpos = (players[i].x + (x_float / len) * 3.0f32 ) as i32;
+                        let ypos = (players[i].y + (y_float / len) * 3.0f32 ) as i32;
 
-        // Game processing done, parse through the list to find object positions
-        for y in 1..(game::BOARD_WIDTH - 1) {
-            for x in 1..(game::BOARD_WIDTH - 1) {
-                unsafe {
-                    if game::BOARD[x + y * game::BOARD_WIDTH] != '.' 
-                    {
-                        board.set_color_in_buffer(x, y, colors::NAVY);
+                        if xpos > 0 && ypos > 0 && xpos < (X_LIMIT-1) as i32 && ypos < (Y_LIMIT-1) as i32 {
+                            players[i].target_x = xpos as usize;
+                            players[i].target_y = ypos as usize;
+                            players[i].use_target = true;
+                        }
                     }
-                }
-            }
-        }
+                } else {
+                    if input.btn_z == 1 {
+                        players[i].shoot_btn = true;
+                    } else if input.joy_x > 100 || input.joy_x < -100 || input.joy_y > 100 || input.joy_y < -100 {
+                        // Move player
+                        let mut moved:bool = false;
+                        let mut x_dir:i8 = 0;
+                        let mut y_dir:i8 = 0;
+                        if input.joy_x > 100 {
+                            x_dir = 1;
+                        } else if input.joy_x < -100 {
+                            x_dir = -1;
+                        }
+                        if input.joy_y > 100 {
+                            y_dir = 1;
+                        } else if input.joy_y < -100 {
+                            y_dir = -1;
+                        }
 
-        for i in 0..=1 
-        {
-            if players[i].shoot_timeout > 0
-            {
-                players[i].shoot_timeout = players[i].shoot_timeout-1;
-            } else if players[i].shoot_btn == true { 
-
-                // Calculate target direction
-                let x_float:f32 = input.joy_x as f32;
-                let y_float:f32 = input.joy_y as f32;
-                let len:f32 = game::fast_sqrt(game::pow2(game::abs(x_float)) + game::pow2(game::abs(y_float)));
-
-
-                // Shoot on release
-                if input.btn_z == 0 {
-                    players[i].shoot_timeout = DEFAULT_TIMEOUT;
-                    players[i].shoot_btn = false;
-                    players[i].use_target = false;
-
-                    let xpos = players[i].x;
-                    let ypos = players[i].y - 0.5f32;
-
-                    let xdir = (x_float / len) * 2.0f32;
-                    let ydir = (y_float / len) * 2.0f32;
-
-                    for ii in 0..(game::MAXIMUM_OBJECTS - 1) {
-
-                        if objects[ii].is_none() || objects[ii].unwrap().symbol == '.' {
-                            let mut symbol = '*';
-                            if i == 1
+                        if x_dir != 0 || y_dir != 0 {
+                            moved = true;
+                            if (players[i].x as i8)+x_dir > 0 && (players[i].x as i8)+x_dir < (X_LIMIT-1) as i8
                             {
-                                symbol = '#';
+                                players[i].x += x_dir as f32;
                             }
-                            let object = game::MovingObject::new(
-                                    game::Vector { x: xpos, y: ypos },
-                                    game::Vector { x: xdir, y: ydir },
-                                    symbol);
-                            objects[ii] = Some(object);                        
-                            if ii + 1 > number_of_objects
+                            if (players[i].y as i8)+y_dir > 0 && (players[i].y as i8)+y_dir < (Y_LIMIT-1)  as i8
                             {
-                                number_of_objects = ii + 1;
+                                players[i].y += y_dir as f32;
                             }
-                            break;
                         }
-                    }
+                        
+                        if moved == true {
+                            players[i].shoot_timeout = DEFAULT_TIMEOUT>>1;
+                        }
 
-                }
-                else {
-                    // Draw target vector
-                    let xpos = (players[i].x + (x_float / len) * 3.0f32 ) as i32;
-                    let ypos = (players[i].y + (y_float / len) * 3.0f32 ) as i32;
-
-                    if xpos > 0 && ypos > 0 && xpos < (X_LIMIT-1) as i32 && ypos < (Y_LIMIT-1) as i32 {
-                        players[i].target_x = xpos as usize;
-                        players[i].target_y = ypos as usize;
-                        players[i].use_target = true;
                     }
                 }
-            } else {
-                if input.btn_z == 1 {
-                    players[i].shoot_btn = true;
-                } else if input.joy_x > 100 || input.joy_x < -100 || input.joy_y > 100 || input.joy_y < -100 {
-                    // Move player
-                    let mut moved:bool = false;
-                    let mut x_dir:i8 = 0;
-                    let mut y_dir:i8 = 0;
-                    if input.joy_x > 100 {
-                        x_dir = 1;
-                    } else if input.joy_x < -100 {
-                        x_dir = -1;
-                    }
-                    if input.joy_y > 100 {
-                        y_dir = 1;
-                    } else if input.joy_y < -100 {
-                        y_dir = -1;
-                    }
-
-                    if x_dir != 0 || y_dir != 0 {
-                        moved = true;
-                        if (players[i].x as i8)+x_dir > 0 && (players[i].x as i8)+x_dir < (X_LIMIT-1) as i8
-                        {
-                            players[i].x += x_dir as f32;
-                        }
-                        if (players[i].y as i8)+y_dir > 0 && (players[i].y as i8)+y_dir < (Y_LIMIT-1)  as i8
-                        {
-                            players[i].y += y_dir as f32;
-                        }
-                    }
-                    
-                    if moved == true {
-                        players[i].shoot_timeout = DEFAULT_TIMEOUT>>1;
-                    }
-
+                
+                if players[i].use_target == true 
+                {
+                    board.set_color_in_buffer(players[i].target_x, players[i].target_y, colors::RED);
                 }
+                board.set_color_in_buffer(players[i].x as usize, players[i].y as usize, colors::YELLOW);
             }
-            
-            if players[i].use_target == true 
-            {
-                board.set_color_in_buffer(players[i].target_x, players[i].target_y, colors::RED);
+
+            board.update_matrix();
+            board.flush_to_buffer();
+
+            for i in 0..number_of_objects {
+                let object = match objects[i] {
+                    Some(o) => o,
+                    None => continue,
+                };
+                let pos = object.position();
+                if object.symbol == '*'
+                {
+                    board.set_color(pos.0 as usize, pos.1 as usize, players[0].color);
+                } else {
+                    board.set_color(pos.0 as usize, pos.1 as usize, players[1].color);
+                }                    
             }
-            board.set_color_in_buffer(players[i].x as usize, players[i].y as usize, colors::YELLOW);
-        }
-
-        board.update_matrix();
-        board.flush_to_buffer();
-
-        for i in 0..number_of_objects {
-            let object = match objects[i] {
-                Some(o) => o,
-                None => continue,
-            };
-            let pos = object.position();
-            if object.symbol == '*'
-            {
-                board.set_color(pos.0 as usize, pos.1 as usize, players[0].color);
-            } else {
-                board.set_color(pos.0 as usize, pos.1 as usize, players[1].color);
-            }                    
+        } else {
+            write!(tx,"x: {} y: {} z: {} c: {}\n", input.joy_x, input.joy_y, input.btn_z, input.btn_c).expect("failed to create buffer");            
         }
 
 

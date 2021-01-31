@@ -25,6 +25,7 @@ use gd32vf103xx_hal::delay::McycleDelay;
 use embedded_hal::blocking::delay::DelayMs;
 
 /// contains the controller data neatly formatted
+#[derive(Copy, Clone)]
 pub struct ControllerInput
 {
 	pub joy_x: i8,
