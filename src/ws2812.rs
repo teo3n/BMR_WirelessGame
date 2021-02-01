@@ -46,7 +46,7 @@ use gd32vf103xx_hal::prelude::*;
 use gd32vf103xx_hal::delay::McycleDelay;
 use embedded_hal::digital::v2::OutputPin;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct RGB
 {
     pub r: u8,
