@@ -77,10 +77,12 @@ struct Player {
 
 fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::USART0>,
      nunchuk_incoming_data: &mut [u8;4],
-      nunchuk_index: &mut i8) -> Option<nunchuk::ControllerInput>
+      nunchuk_index: &mut i8,
+      tx: &mut gd32vf103xx_hal::serial::Tx<gd32vf103xx_hal::pac::USART1>,) -> Option<nunchuk::ControllerInput>
 {
     let mut full_input_received = false;
     let mut input = nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0};
+    
     loop {
         let read_byte = nb::block!(rx.read());
         let byte = match read_byte {
@@ -91,17 +93,23 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
         if byte.is_none() {
             break;
         }
+        
+        //tx.write(byte.unwrap());
+        
 
         // Waiting for DATA string
         if *nunchuk_index < 0
         {
-            if byte.unwrap() == INCOMING_DATA_HEADER[(*nunchuk_index+4) as usize] as u8
+            //write!(tx, "{} == {}\r\n", byte.unwrap() as char, INCOMING_DATA_HEADER[((*nunchuk_index)+4) as usize]);
+
+            if byte.unwrap() == INCOMING_DATA_HEADER[((*nunchuk_index)+4) as usize] as u8
             {
                 *nunchuk_index = *nunchuk_index+1;
             } else {
                 *nunchuk_index = -4;
             }
         } else {
+            //write!(tx, "i: {}", *nunchuk_index);
             // Receive 4 bytes of actual data
             nunchuk_incoming_data[(*nunchuk_index) as usize] = byte.unwrap();
             *nunchuk_index = *nunchuk_index+1;
@@ -114,6 +122,8 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
                 input.joy_y = (nunchuk_incoming_data[1] as i8) * -1;
                 input.btn_z = nunchuk_incoming_data[2];
                 input.btn_c = nunchuk_incoming_data[3];
+
+                write!(tx, "Got {} {}\r\n", input.joy_x, input.joy_y);
 
             }
         }
@@ -154,9 +164,21 @@ fn main() -> ! {
         &mut afio,
         &mut rcu,
     );
+
+    let pin_tx2 = gpioa.pa2.into_alternate_push_pull();
+    let pin_rx2 = gpioa.pa3.into_floating_input();
+
+    let mut serial2 = Serial::new(
+        periph.USART1,
+        (pin_tx2, pin_rx2),
+        Config::default().baudrate(74880.bps()),
+        &mut afio,
+        &mut rcu,
+    );
     //serial.listen(gd32vf103xx_hal::serial::Event::Rxne);
 
     let (mut tx, mut rx) = serial.split();
+    let (mut tx2, mut rx2) = serial2.split();
 
     if SERIAL_DEBUG == true
     {
@@ -243,8 +265,8 @@ fn main() -> ! {
     {
         players[0].input = nchuck.get_input();
         nunchuk_data = nchuck.serialize();
-        let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index);
-        
+        let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index, &mut tx2);
+        write!(tx, "NOP\n");
         if remote_data.is_none() == false
         {
             players[1].input = remote_data.unwrap();
