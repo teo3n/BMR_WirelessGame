@@ -56,8 +56,9 @@ const Y_LIMIT: usize = 16;
 
 const OLED_DEBUG_SCREEN: bool = false;
 const SERIAL_DEBUG: bool = false;
-const MASTER_DEVICE: bool = false;
+const MASTER_DEVICE: bool = true;
 const DEFAULT_TIMEOUT: u8 = 10;
+const INCOMING_DATA_HEADER: [char;4] = ['D','A','T','A'];
 
 #[derive(Copy, Clone)]
 struct Player {
@@ -72,6 +73,49 @@ struct Player {
     use_target: bool,
     target_original_color: RGB,
     input: nunchuk::ControllerInput,
+}
+
+fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::USART0>, nunchuk_incoming_data: &mut [u8;4], nunchuk_index: &mut i8) -> Option<nunchuk::ControllerInput>
+{
+    let mut full_input_received = false;
+    let mut input = nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0};
+    loop {
+        let byte = match rx.read() {
+            Ok(o) => Some(o),
+            Err(e) => None,
+        };
+
+        if byte.is_none() {
+            break;
+        }
+        if *nunchuk_index < 0
+        {
+            if byte.unwrap() == INCOMING_DATA_HEADER[(*nunchuk_index+4) as usize] as u8
+            {
+                *nunchuk_index = *nunchuk_index+1;
+            } else {
+                *nunchuk_index = -4;
+            }
+        } else {
+            nunchuk_incoming_data[(*nunchuk_index) as usize] = byte.unwrap();
+            *nunchuk_index = *nunchuk_index+1;
+            if *nunchuk_index == 4 
+            {
+                *nunchuk_index = -4;
+                full_input_received = true;
+                input.joy_x = nunchuk_incoming_data[0] as i8;
+                input.joy_y = nunchuk_incoming_data[1] as i8;
+                input.btn_z = nunchuk_incoming_data[2];
+                input.btn_c = nunchuk_incoming_data[3];
+
+            }
+        }
+        
+    }
+    if full_input_received {
+        return Some(input);
+    }
+    return None;
 }
 
 #[entry]
@@ -180,9 +224,19 @@ fn main() -> ! {
 
     delay.delay_ms(100);
 
+    let mut nunchuk_data: [u8;4] = [0;4];
+    let mut nunchuk_incoming_data: [u8;4] = [0;4];
+    let mut nunchuk_index: i8 = -4;
+
     loop
     {
         players[0].input = nchuck.get_input();
+        nunchuk_data = nchuck.serialize();
+        let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index);
+        if !remote_data.is_none()
+        {
+            players[1].input = remote_data.unwrap();
+        }
         let mut input = players[0].input;
 
         if OLED_DEBUG_SCREEN == true
@@ -295,8 +349,8 @@ fn main() -> ! {
                         players[i].shoot_btn = false;
                         players[i].use_target = false;
 
-                        let xpos = players[i].x;
-                        let ypos = players[i].y - 0.5f32;
+                        let xpos = players[i].x - 1.0f32;
+                        let ypos = players[i].y - 1.0f32;
 
                         let xdir = (x_float / len) * 2.0f32;
                         let ydir = (y_float / len) * 2.0f32;
@@ -396,7 +450,11 @@ fn main() -> ! {
                 }                    
             }
         } else {
-            write!(tx,"x: {} y: {} z: {} c: {}\n", input.joy_x, input.joy_y, input.btn_z, input.btn_c).expect("failed to create buffer");            
+            write!(tx,"DATA").expect("failed to create buffer");
+            for x in &nunchuk_data {
+                nb::block!(tx.write(*x)).expect("failed to write");
+            }
+            write!(tx,"END\n").expect("failed to create buffer");
         }
 
 
