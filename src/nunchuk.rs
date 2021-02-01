@@ -37,10 +37,27 @@ pub struct ControllerInput
 	pub btn_c: u8,
 }
 
+impl ControllerInput
+{
+	pub fn empty() -> Self
+	{
+		ControllerInput {
+			joy_x: 0,
+			joy_y: 0,
+			accel_x: 0,
+			accel_y: 0,
+			accel_z: 0,
+			btn_z: 0,
+			btn_c: 0,
+		}
+	}
+}
+
 pub struct Nunchuk<'a>
 {
 	i2c_handle: BlockingI2c<I2C0, (PB8<Alternate<OpenDrain>>, PB9<Alternate<OpenDrain>>)>,
 	rcu: &'a mut Rcu,
+	last_input: ControllerInput,
 }
 
 // public methods
@@ -69,7 +86,8 @@ impl<'a> Nunchuk<'a>
 		        998,
 		        998
 		    ),
-		    rcu
+			rcu,
+			last_input: ControllerInput::empty()
 		};
 
 		let mut delay = McycleDelay::new(&nchuk.rcu.clocks);
@@ -80,12 +98,24 @@ impl<'a> Nunchuk<'a>
 		return nchuk;
 	}
 
+	pub fn serialize(&self) -> [u8; 4]
+	{
+		[
+			self.last_input.joy_x as u8,
+			self.last_input.joy_y as u8,
+			self.last_input.btn_z,
+			self.last_input.btn_c
+		]
+	}
+
 	/// reads from the nunchuk over i2c and returns
 	/// the controller data in a nearly formatted structure
 	pub fn get_input(&mut self) -> ControllerInput
 	{
 		let buffer = self.read_input();
-		return self.decode_input(buffer);
+		let input = self.decode_input(buffer);
+		self.last_input = input;
+		return input;
 	}
 }
 
