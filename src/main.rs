@@ -82,7 +82,7 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
 {
     let mut full_input_received = false;
     let mut input = nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0};
-    
+    let mut bytes = 0;
     loop {
         let read_byte = nb::block!(rx.read());
         let byte = match read_byte {
@@ -93,7 +93,7 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
         if byte.is_none() {
             break;
         }
-        
+        bytes = bytes +1;
         //tx.write(byte.unwrap());
         
 
@@ -118,10 +118,22 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
                 // Reset the index at the 4th byte and extract the data to the ControllerInput
                 *nunchuk_index = -4;
                 full_input_received = true;
-                input.joy_x = (nunchuk_incoming_data[0] as i8) * -1;
-                input.joy_y = (nunchuk_incoming_data[1] as i8) * -1;
+                input.joy_x = ((nunchuk_incoming_data[0] as i8));
+                input.joy_y = ((nunchuk_incoming_data[1] as i8));
                 input.btn_z = nunchuk_incoming_data[2];
                 input.btn_c = nunchuk_incoming_data[3];
+
+                if input.joy_x > 100 {
+                    input.joy_x = -120;
+                } else if input.joy_x < -100 {
+                    input.joy_x = 120;
+                }
+
+                if input.joy_y > 100 {
+                    input.joy_y = -120;
+                } else if input.joy_y < -100 {
+                    input.joy_y = 120;
+                }
 
                 write!(tx, "Got {} {}\r\n", input.joy_x, input.joy_y);
 
@@ -129,6 +141,7 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
         }
         
     }
+    write!(tx, "Read: {}\r\n", bytes);
     if full_input_received {
         return Some(input);
     }
@@ -265,8 +278,7 @@ fn main() -> ! {
     {
         players[0].input = nchuck.get_input();
         nunchuk_data = nchuck.serialize();
-        let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index, &mut tx2);
-        write!(tx, "NOP\n");
+        let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index, &mut tx2);        
         if remote_data.is_none() == false
         {
             players[1].input = remote_data.unwrap();
