@@ -75,12 +75,15 @@ struct Player {
     input: nunchuk::ControllerInput,
 }
 
-fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::USART0>, nunchuk_incoming_data: &mut [u8;4], nunchuk_index: &mut i8) -> Option<nunchuk::ControllerInput>
+fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::USART0>,
+     nunchuk_incoming_data: &mut [u8;4],
+      nunchuk_index: &mut i8) -> Option<nunchuk::ControllerInput>
 {
     let mut full_input_received = false;
     let mut input = nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0};
     loop {
-        let byte = match rx.read() {
+        let read_byte = nb::block!(rx.read());
+        let byte = match read_byte {
             Ok(o) => Some(o),
             Err(e) => None,
         };
@@ -88,6 +91,8 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
         if byte.is_none() {
             break;
         }
+
+        // Waiting for DATA string
         if *nunchuk_index < 0
         {
             if byte.unwrap() == INCOMING_DATA_HEADER[(*nunchuk_index+4) as usize] as u8
@@ -97,14 +102,16 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
                 *nunchuk_index = -4;
             }
         } else {
+            // Receive 4 bytes of actual data
             nunchuk_incoming_data[(*nunchuk_index) as usize] = byte.unwrap();
             *nunchuk_index = *nunchuk_index+1;
             if *nunchuk_index == 4 
             {
+                // Reset the index at the 4th byte and extract the data to the ControllerInput
                 *nunchuk_index = -4;
                 full_input_received = true;
-                input.joy_x = nunchuk_incoming_data[0] as i8;
-                input.joy_y = nunchuk_incoming_data[1] as i8;
+                input.joy_x = (nunchuk_incoming_data[0] as i8) * -1;
+                input.joy_y = (nunchuk_incoming_data[1] as i8) * -1;
                 input.btn_z = nunchuk_incoming_data[2];
                 input.btn_c = nunchuk_incoming_data[3];
 
@@ -137,13 +144,17 @@ fn main() -> ! {
     let mut afio = periph.AFIO.constrain(&mut rcu);
     let mut delay = McycleDelay::new(&rcu.clocks);
 
-    let serial = Serial::new(
+    let pin_tx = gpioa.pa9.into_alternate_push_pull();
+    let pin_rx = gpioa.pa10.into_floating_input();
+
+    let mut serial = Serial::new(
         periph.USART0,
-        (gpioa.pa9, gpioa.pa10),
+        (pin_tx, pin_rx),
         Config::default().baudrate(74880.bps()),
         &mut afio,
         &mut rcu,
     );
+    //serial.listen(gd32vf103xx_hal::serial::Event::Rxne);
 
     let (mut tx, mut rx) = serial.split();
 
@@ -233,10 +244,13 @@ fn main() -> ! {
         players[0].input = nchuck.get_input();
         nunchuk_data = nchuck.serialize();
         let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index);
-        if !remote_data.is_none()
+        
+        if remote_data.is_none() == false
         {
             players[1].input = remote_data.unwrap();
+            board.set_color(0,0, colors::BLACK);
         }
+        
         let mut input = players[0].input;
 
         if OLED_DEBUG_SCREEN == true
@@ -450,15 +464,67 @@ fn main() -> ! {
                 }                    
             }
         } else {
+            // Send data to the other player
             write!(tx,"DATA").expect("failed to create buffer");
-            for x in &nunchuk_data {
-                nb::block!(tx.write(*x)).expect("failed to write");
+            delay.delay_ms(1);
+            for i in 0..4 {
+                nb::block!(tx.write(nunchuk_data[i])).expect("failed to write");
             }
             write!(tx,"END\n").expect("failed to create buffer");
         }
+       
+            
 
 
-        // ToDo: Calculate score
+        // Calculate score
+        const total_pixels: u8 = 14*14;
+        let mut score: [u8;2] = [0;2];
+        for y in 1..(game::BOARD_WIDTH - 1) {
+            for x in 1..(game::BOARD_WIDTH - 1) {
+                let color = board.get_color(x, y);
+                if color == players[0].color
+                {
+                    score[0] = score[0] + 1;
+                } 
+                if color == players[1].color
+                {
+                    score[1] = score[1] + 1;
+                } 
+            }
+        }
+
+        // Ending condition
+        if score[0]+score[1] == total_pixels
+        {
+            let mut color_end: RGB = colors::BLACK;
+            if score[0] > score[1] {
+                color_end = players[0].color;
+            } else if score[0] < score[1] {
+                color_end = players[1].color;
+            } else { // Tie
+                color_end = colors::GREEN;
+            }
+
+            // Blink the winner color
+            loop {                
+                for y in 1..(game::BOARD_WIDTH - 1) {
+                    for x in 1..(game::BOARD_WIDTH - 1) {
+                        board.set_color_in_buffer(x, y, color_end);
+                    }
+                }
+                board.update_matrix();
+                board.flush_to_buffer();
+                delay.delay_ms(1000);
+                for y in 1..(game::BOARD_WIDTH - 1) {
+                    for x in 1..(game::BOARD_WIDTH - 1) {
+                        board.set_color_in_buffer(x, y, colors::BLACK);
+                    }
+                }
+                board.update_matrix();
+                board.flush_to_buffer();
+                delay.delay_ms(1000);
+            }
+        }
 
         delay.delay_ms(100);
     }
