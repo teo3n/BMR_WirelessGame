@@ -9,7 +9,7 @@ const UART_CONF0: *mut u32 = (UART_BASE + 0x20) as *mut u32;
 const UART_CONF1: *mut u32 = (UART_BASE + 0x24) as *mut u32;
 
 
-
+// Bit-bang initialize the UART
 pub fn init() -> bool {
 
     unsafe { 
@@ -28,7 +28,7 @@ pub fn init() -> bool {
     true
 }
 
-
+// Iterate through a string and push each character to the UART FIFO buffer
 pub fn writestring(input: &str) -> bool {
     unsafe {
         let _e = input.as_bytes()
@@ -38,6 +38,7 @@ pub fn writestring(input: &str) -> bool {
     true
 }
 
+// Write a single character to UART FIFO
 pub fn writechr(input: u8) -> bool {
     unsafe {
         UART_FIFO.write_volatile(input);
@@ -45,6 +46,7 @@ pub fn writechr(input: u8) -> bool {
     true
 }
 
+// Convert number to a string and write the UART FIFO, supports whole 32-bit integer range
 pub fn writenum(input: i32) -> bool {
 
     if input == 0 {
@@ -77,6 +79,7 @@ pub fn writenum(input: i32) -> bool {
     true
 }
 
+// Read one character from the UART FIFO
 pub fn readchr(byte: &mut u8) -> bool {
     unsafe {
         if UART_STATUS.read_volatile() & 0xff == 0 {

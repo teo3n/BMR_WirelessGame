@@ -24,8 +24,8 @@ pub fn clear_board() {
 pub fn print_board() {
     for y in 0..(BOARD_WIDTH) {
         for x in 0..(BOARD_WIDTH) {
-            unsafe {
-            }
+            //unsafe {
+            //}
         }
     }
 }

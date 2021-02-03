@@ -39,7 +39,7 @@ where T: OutputPin
 {
     pub fn new(pin: &'a mut T, max_score: u8 ) -> Self
     {
-        let mut ws = Ws2812::<_, LED_COUNT>::new(108_000_000, pin);
+        let ws = Ws2812::<_, LED_COUNT>::new(108_000_000, pin);
 
         return ScoreBoard
         {

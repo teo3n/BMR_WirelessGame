@@ -56,25 +56,31 @@ const Y_LIMIT: usize = 16;
 
 const OLED_DEBUG_SCREEN: bool = false;
 const SERIAL_DEBUG: bool = false;
-const MASTER_DEVICE: bool = true;
+const MASTER_DEVICE: bool = false;
 const DEFAULT_TIMEOUT: u8 = 10;
 const INCOMING_DATA_HEADER: [char;4] = ['D','A','T','A'];
+const INCOMING_DATA_LEN: i8 = 4;
+const NUNCHUK_THRES: i8 = 100; // threshold for moving
+const PROJECTILE_NONE: char = '.';
+const PROJECTILE_P1: char = '*';
+const PROJECTILE_P2: char = '#';
 
 #[derive(Copy, Clone)]
 struct Player {
     x: f32,
     y: f32,
     color: RGB,
-    color_under: RGB,
     shoot_timeout: u8,
     shoot_btn: bool,
     target_x:usize,
     target_y:usize,
     use_target: bool,
-    target_original_color: RGB,
     input: nunchuk::ControllerInput,
 }
 
+// Read UART for input containing the remote player joystick etc data
+// Checks for header string "DATA" and reads 4 bytes after that
+// Returns either the full input values or None
 fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::USART0>,
      nunchuk_incoming_data: &mut [u8;4],
       nunchuk_index: &mut i8,
@@ -100,26 +106,26 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
         // Waiting for DATA string
         if *nunchuk_index < 0
         {
-            //write!(tx, "{} == {}\r\n", byte.unwrap() as char, INCOMING_DATA_HEADER[((*nunchuk_index)+4) as usize]);
-
+            // Iterate through the expected header string "DATA"
             if byte.unwrap() == INCOMING_DATA_HEADER[((*nunchuk_index)+4) as usize] as u8
             {
                 *nunchuk_index = *nunchuk_index+1;
-            } else {
+            } else { // Start from the beginning even if one character is wrong                
                 *nunchuk_index = -4;
             }
-        } else {
-            //write!(tx, "i: {}", *nunchuk_index);
+        } else { // Header received
             // Receive 4 bytes of actual data
             nunchuk_incoming_data[(*nunchuk_index) as usize] = byte.unwrap();
             *nunchuk_index = *nunchuk_index+1;
-            if *nunchuk_index == 4 
+
+            // Check if the last byte is received
+            if *nunchuk_index == INCOMING_DATA_LEN 
             {
                 // Reset the index at the 4th byte and extract the data to the ControllerInput
                 *nunchuk_index = -4;
                 full_input_received = true;
-                input.joy_x = ((nunchuk_incoming_data[0] as i8));
-                input.joy_y = ((nunchuk_incoming_data[1] as i8));
+                input.joy_x = nunchuk_incoming_data[0] as i8;
+                input.joy_y = nunchuk_incoming_data[1] as i8;
                 input.btn_z = nunchuk_incoming_data[2];
                 input.btn_c = nunchuk_incoming_data[3];
 
@@ -135,13 +141,14 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
                     input.joy_y = 120;
                 }
 
-                write!(tx, "Got {} {}\r\n", input.joy_x, input.joy_y);
+                // Debug
+                write!(tx, "Got {} {}\r\n", input.joy_x, input.joy_y).expect("failed to create buffer");
 
             }
         }
         
     }
-    write!(tx, "Read: {}\r\n", bytes);
+    write!(tx, "Read: {}\r\n", bytes).expect("failed to create buffer");
     if full_input_received {
         return Some(input);
     }
@@ -170,7 +177,8 @@ fn main() -> ! {
     let pin_tx = gpioa.pa9.into_alternate_push_pull();
     let pin_rx = gpioa.pa10.into_floating_input();
 
-    let mut serial = Serial::new(
+    // Initialize serial for inputting player data through ESP8266
+    let serial = Serial::new(
         periph.USART0,
         (pin_tx, pin_rx),
         Config::default().baudrate(74880.bps()),
@@ -181,7 +189,8 @@ fn main() -> ! {
     let pin_tx2 = gpioa.pa2.into_alternate_push_pull();
     let pin_rx2 = gpioa.pa3.into_floating_input();
 
-    let mut serial2 = Serial::new(
+    // Use 2nd UART for debugging while the other is occupied with player input data
+    let serial2 = Serial::new(
         periph.USART1,
         (pin_tx2, pin_rx2),
         Config::default().baudrate(74880.bps()),
@@ -191,7 +200,7 @@ fn main() -> ! {
     //serial.listen(gd32vf103xx_hal::serial::Event::Rxne);
 
     let (mut tx, mut rx) = serial.split();
-    let (mut tx2, mut rx2) = serial2.split();
+    let (mut tx2, rx2) = serial2.split();
 
     if SERIAL_DEBUG == true
     {
@@ -225,13 +234,11 @@ fn main() -> ! {
 
     let temp_player = Player { x: 7.0f32, y:1.0f32, 
         color:colors::PURPLE,
-        color_under:colors::BLACK,
         shoot_timeout: 4,
         shoot_btn: false,
         target_x: 0,
         target_y: 0,
         use_target: false,
-        target_original_color: colors::BLACK,
         input: nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0},
     };
     let mut players = [temp_player, temp_player];
@@ -241,7 +248,6 @@ fn main() -> ! {
 
     let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
     let mut number_of_objects: usize = 0;
-    let mut index = 0;
 	
     delay.delay_ms(10);
 
@@ -266,18 +272,19 @@ fn main() -> ! {
     let mut sboard_pin = gpiob.pb6.into_push_pull_output();
 
     // second argument is the maximum score
-    let mut sboard = ScoreBoard::new(&mut sboard_pin, 5);
+    let sboard = ScoreBoard::new(&mut sboard_pin, 5);
 
     delay.delay_ms(100);
 
-    let mut nunchuk_data: [u8;4] = [0;4];
+    // Temporary buffers for storing incoming nunchuk data
+    let mut nunchuk_data: [u8;4];
     let mut nunchuk_incoming_data: [u8;4] = [0;4];
     let mut nunchuk_index: i8 = -4;
 
     loop
     {
-        players[0].input = nchuck.get_input();
-        nunchuk_data = nchuck.serialize();
+        players[0].input = nchuck.get_input();        
+        // Read other player's nunchuk data from UART, if available
         let remote_data = read_remote_joy(&mut rx, &mut nunchuk_incoming_data, &mut nunchuk_index, &mut tx2);        
         if remote_data.is_none() == false
         {
@@ -317,15 +324,15 @@ fn main() -> ! {
             //write!(tx,"az: {}: ay: {} az: {}  \r\n", input.accel_x, input.accel_y, input.accel_z).expect("failed to create buffer");
         }
 
+        // Master device handles the game logic and drawing to the screen
         if MASTER_DEVICE == true {
 
-            
+            // Apply the game physics
             if number_of_objects > 0 {
                 game::game_tick(&mut objects, number_of_objects);
             }
             game::clear_board();
 
-            let mut moving: bool = false;
             for i in 0..number_of_objects {
                 let mut object = match objects[i] {
                     Some(o) => o,
@@ -334,8 +341,8 @@ fn main() -> ! {
 
                 let pos = object.position();
                 
-                if object.moving() == false || object.get_age() > 100 {
-                    // "Explode" objects that have stopped
+                // "Explode" objects that have stopped
+                if object.moving() == false || object.get_age() > 100 {                    
                     for obj_x in pos.0-2..=pos.0+2
                     {
                         for obj_y in pos.1-2..=pos.1+2
@@ -343,7 +350,7 @@ fn main() -> ! {
                             if obj_x > 0 && obj_x < (game::BOARD_WIDTH - 1) &&
                                 obj_y > 0 && obj_y < (game::BOARD_WIDTH - 1)
                             {
-                                if object.symbol == '*'
+                                if object.symbol == PROJECTILE_P1
                                 {
                                     board.set_color(obj_x, obj_y, players[0].color);
                                 } else {
@@ -353,7 +360,7 @@ fn main() -> ! {
                         }
                     }
                     objects[i] = None;
-                } else {
+                } else { // Object not stopped yet, add to the game logic output
                     if pos.0 < 1 || pos.1 < 1 || pos.0 > game::BOARD_WIDTH - 1 || pos.1 > game::BOARD_WIDTH - 1 {
                         // ToDo: do something with out-of-bounds object
                     } else {
@@ -365,11 +372,11 @@ fn main() -> ! {
                 }
             }
 
-            // Game processing done, parse through the list to find object positions
+            // Game logic processing done, parse through the list to find object positions from the output
             for y in 1..(game::BOARD_WIDTH - 1) {
                 for x in 1..(game::BOARD_WIDTH - 1) {
                     unsafe {
-                        if game::BOARD[x + y * game::BOARD_WIDTH] != '.' 
+                        if game::BOARD[x + y * game::BOARD_WIDTH] != PROJECTILE_NONE 
                         {
                             board.set_color_in_buffer(x, y, colors::NAVY);
                         }
@@ -377,45 +384,52 @@ fn main() -> ! {
                 }
             }
 
-            for i in 0..=1 
+            // Iterate both players
+            for i in 0..=1
             {
                 input = players[i].input;
+
+                // If we are waiting after shooting or moving
                 if players[i].shoot_timeout > 0
                 {
                     players[i].shoot_timeout = players[i].shoot_timeout-1;
-                } else if players[i].shoot_btn == true { 
+                } else if players[i].shoot_btn == true { // Trigger is pressed down, draw the targeting indicator
 
                     // Calculate target direction
                     let x_float:f32 = input.joy_x as f32;
                     let y_float:f32 = input.joy_y as f32;
                     let len:f32 = game::fast_sqrt(game::pow2(game::abs(x_float)) + game::pow2(game::abs(y_float)));
 
-
-                    // Shoot on release
+                    // Shoot when player button was pressed and now released
                     if input.btn_z == 0 {
                         players[i].shoot_timeout = DEFAULT_TIMEOUT;
                         players[i].shoot_btn = false;
                         players[i].use_target = false;
 
+                        // Add offset to the projectile to compensate the game logic
                         let xpos = players[i].x - 1.0f32;
                         let ypos = players[i].y - 1.0f32;
 
                         let xdir = (x_float / len) * 2.0f32;
                         let ydir = (y_float / len) * 2.0f32;
 
+                        // Iterate through the existing object list to find first empty space to push new
                         for ii in 0..(game::MAXIMUM_OBJECTS - 1) {
 
-                            if objects[ii].is_none() || objects[ii].unwrap().symbol == '.' {
-                                let mut symbol = '*';
+                            if objects[ii].is_none() || objects[ii].unwrap().symbol == PROJECTILE_NONE {
+
+                                // Select correct symbol to know which player was shooting
+                                let mut symbol = PROJECTILE_P1;
                                 if i == 1
                                 {
-                                    symbol = '#';
+                                    symbol = PROJECTILE_P2;
                                 }
+
                                 let object = game::MovingObject::new(
                                         game::Vector { x: xpos, y: ypos },
                                         game::Vector { x: xdir, y: ydir },
                                         symbol);
-                                objects[ii] = Some(object);                        
+                                objects[ii] = Some(object);
                                 if ii + 1 > number_of_objects
                                 {
                                     number_of_objects = ii + 1;
@@ -424,37 +438,45 @@ fn main() -> ! {
                             }
                         }
 
-                    }
-                    else {
-                        // Draw target vector
+                    } else { // Draw target vector if player still holding the trigger
+                        
                         let xpos = (players[i].x + (x_float / len) * 3.0f32 ) as i32;
                         let ypos = (players[i].y + (y_float / len) * 3.0f32 ) as i32;
 
+                        // Make sure the target is not outside the boundaries
                         if xpos > 0 && ypos > 0 && xpos < (X_LIMIT-1) as i32 && ypos < (Y_LIMIT-1) as i32 {
                             players[i].target_x = xpos as usize;
                             players[i].target_y = ypos as usize;
                             players[i].use_target = true;
                         }
                     }
-                } else {
+                } else { // If player is not waiting and not pressing the trigger yet
                     if input.btn_z == 1 {
                         players[i].shoot_btn = true;
-                    } else if input.joy_x > 100 || input.joy_x < -100 || input.joy_y > 100 || input.joy_y < -100 {
-                        // Move player
+                    } else if input.joy_x > NUNCHUK_THRES ||
+                              input.joy_x < -NUNCHUK_THRES ||
+                              input.joy_y > NUNCHUK_THRES ||
+                              input.joy_y < -NUNCHUK_THRES {
+                        // Move player when joystick (range -128..127) over NUNCHUK_THRES
                         let mut moved:bool = false;
                         let mut x_dir:i8 = 0;
                         let mut y_dir:i8 = 0;
-                        if input.joy_x > 100 {
+
+                        // Check if moving on X-axis
+                        if input.joy_x > NUNCHUK_THRES {
                             x_dir = 1;
-                        } else if input.joy_x < -100 {
+                        } else if input.joy_x < -NUNCHUK_THRES {
                             x_dir = -1;
                         }
-                        if input.joy_y > 100 {
+
+                        // Check if moving on Y-axis
+                        if input.joy_y > NUNCHUK_THRES {
                             y_dir = 1;
-                        } else if input.joy_y < -100 {
+                        } else if input.joy_y < -NUNCHUK_THRES {
                             y_dir = -1;
                         }
 
+                        // If we are moving make sure we are not over the boundaries in any direction
                         if x_dir != 0 || y_dir != 0 {
                             moved = true;
                             if (players[i].x as i8)+x_dir > 0 && (players[i].x as i8)+x_dir < (X_LIMIT-1) as i8
@@ -467,6 +489,7 @@ fn main() -> ! {
                             }
                         }
                         
+                        // Add "shoot timeout" also after moving
                         if moved == true {
                             players[i].shoot_timeout = DEFAULT_TIMEOUT>>1;
                         }
@@ -474,16 +497,21 @@ fn main() -> ! {
                     }
                 }
                 
+                // If targeting was enabled, draw the actual red target to screen
                 if players[i].use_target == true 
                 {
                     board.set_color_in_buffer(players[i].target_x, players[i].target_y, colors::RED);
                 }
+
+                // Draw the player to the screen without adding to the game board
                 board.set_color_in_buffer(players[i].x as usize, players[i].y as usize, colors::YELLOW);
             }
 
+            // Update the whole display
             board.update_matrix();
             board.flush_to_buffer();
 
+            // Draw a trail after the projectiles using the shooting player color
             for i in 0..number_of_objects {
                 let object = match objects[i] {
                     Some(o) => o,
@@ -497,8 +525,11 @@ fn main() -> ! {
                     board.set_color(pos.0 as usize, pos.1 as usize, players[1].color);
                 }                    
             }
-        } else {
-            // Send data to the other player
+        } else { // Client device only sends the current nunchuk data to the master
+
+            nunchuk_data = nchuck.serialize();
+
+            // Send data to the master
             write!(tx,"DATA").expect("failed to create buffer");
             delay.delay_ms(1);
             for i in 0..4 {
@@ -506,12 +537,11 @@ fn main() -> ! {
             }
             write!(tx,"END\n").expect("failed to create buffer");
         }
-       
-            
 
-
+        //
         // Calculate score
-        const total_pixels: u8 = 14*14;
+        //
+        const TOTAL_PIXELS: u8 = 14*14;
         let mut score: [u8;2] = [0;2];
         for y in 1..(game::BOARD_WIDTH - 1) {
             for x in 1..(game::BOARD_WIDTH - 1) {
@@ -527,10 +557,12 @@ fn main() -> ! {
             }
         }
 
-        // Ending condition
-        if score[0]+score[1] == total_pixels
+        // Ending condition, two colors cover the whole board
+        if score[0]+score[1] == TOTAL_PIXELS
         {
-            let mut color_end: RGB = colors::BLACK;
+            let color_end: RGB;
+
+            // Check for the winned and select the color
             if score[0] > score[1] {
                 color_end = players[0].color;
             } else if score[0] < score[1] {
@@ -539,7 +571,7 @@ fn main() -> ! {
                 color_end = colors::GREEN;
             }
 
-            // Blink the winner color
+            // Blink the winner color until reset
             loop {                
                 for y in 1..(game::BOARD_WIDTH - 1) {
                     for x in 1..(game::BOARD_WIDTH - 1) {
