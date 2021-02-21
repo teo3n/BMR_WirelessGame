@@ -67,7 +67,7 @@ pub struct Vector {
 }
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct MovingObject {
     velocity: Vector,
     location: Vector,
@@ -132,8 +132,8 @@ impl MovingObject {
         }
     }
 
-    fn get_collisions(self,
-                      others: [Option<MovingObject>; MAXIMUM_OBJECTS],
+    fn get_collisions(&self,
+                      others: &[Option<MovingObject>; MAXIMUM_OBJECTS],
                       offset: usize,
                       max_duration: f32, ) -> [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] {
         let new_loc = Vector {
@@ -165,7 +165,7 @@ impl MovingObject {
         }
 
         for i in offset + 1..MAXIMUM_OBJECTS {
-            let other = match others[i] {
+            let other = match &others[i] {
                 Some(o) => o,
                 None => continue
             };
@@ -183,11 +183,11 @@ impl MovingObject {
         return collisions;
     }
 
-    pub fn position(self) -> (usize, usize) {
+    pub fn position(&self) -> (usize, usize) {
         ((self.location.x + 1.5) as usize, (self.location.y + 1.5) as usize)
     }
 
-    pub fn moving(self) -> bool {
+    pub fn moving(&self) -> bool {
         return self.velocity.x != 0f32 || self.velocity.y != 0f32;
     }
     pub fn clear_symbol(&mut self)  {
@@ -196,7 +196,7 @@ impl MovingObject {
     pub fn add_age(&mut self)  {
         self.age = self.age + 1;
     }
-    pub fn get_age(self) -> usize {
+    pub fn get_age(&self) -> usize {
         self.age
     }
 }
@@ -208,11 +208,11 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
         let mut all_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] = [None; MAXIMUM_COLLISIONS];
         let mut total_collisions: usize = 0;
         for i in 0..number_of_objects {
-            let ob = match objects[i] {
+            let ob = match &objects[i] {
                 Some(o) => o,
                 None => continue,
             };
-            let temp = ob.get_collisions(*objects, i, 1f32 - tick_so_far);
+            let temp = ob.get_collisions(objects, i, 1f32 - tick_so_far);
             for i in 0..MAX_COLLISIONS_PER_OBJECT {
                 match temp[i] {
                     Some(_) => (),
@@ -257,7 +257,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
                 Some(o) => (o.0, o.2),
                 None => break,
             };
-            let mut first_collider = match objects[first_idx] {
+            let mut first_collider = match objects[first_idx].clone() {
                 Some(o) => o,
                 None => panic!()
             };
@@ -273,7 +273,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
                     y: -first_collider.velocity.y,
                 });
             } else {
-                let mut other_collider = match objects[other_idx] {
+                let other_collider = &mut match objects[other_idx].clone() {
                     Some(o) => o,
                     None => panic!()
                 };
@@ -310,16 +310,14 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
             }
         }
         for i in 0..number_of_objects {
-            let mut temp = match objects[i] {
+            let temp = &mut match objects[i].clone() {
                 Some(o) => o,
                 None => continue
             };
             temp.tick(duration,
                       !(tick_so_far + duration < 1f32),
                       collision_velocities[i]);
-            objects[i] = Some(
-                temp
-            );
+
         }
 
         if num_used_collisions != 0 {
@@ -328,7 +326,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
                     Some(o) => (o.0, o.2),
                     None => break,
                 };
-                let object = match objects[first_idx] {
+                let object = match &objects[first_idx] {
                     Some(o) => o,
                     None => panic!()
                 };

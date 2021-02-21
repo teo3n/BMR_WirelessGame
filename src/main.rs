@@ -246,7 +246,7 @@ fn main() -> ! {
     players[1].x = 8.0f32;
     players[1].color = colors::OLIVE;
 
-    let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
+    let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = Default::default();
     let mut number_of_objects: usize = 0;
 	
     delay.delay_ms(10);
@@ -334,7 +334,7 @@ fn main() -> ! {
             game::clear_board();
 
             for i in 0..number_of_objects {
-                let mut object = match objects[i] {
+                let object = &mut  match objects[i].clone() {
                     Some(o) => o,
                     None => continue,
                 };
@@ -416,7 +416,7 @@ fn main() -> ! {
                         // Iterate through the existing object list to find first empty space to push new
                         for ii in 0..(game::MAXIMUM_OBJECTS - 1) {
 
-                            if objects[ii].is_none() || objects[ii].unwrap().symbol == PROJECTILE_NONE {
+                            if objects[ii].is_none() || objects[ii].as_ref().unwrap().symbol == PROJECTILE_NONE {
 
                                 // Select correct symbol to know which player was shooting
                                 let mut symbol = PROJECTILE_P1;
@@ -513,7 +513,7 @@ fn main() -> ! {
 
             // Draw a trail after the projectiles using the shooting player color
             for i in 0..number_of_objects {
-                let object = match objects[i] {
+                let object = match &objects[i] {
                     Some(o) => o,
                     None => continue,
                 };
