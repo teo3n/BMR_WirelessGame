@@ -30,7 +30,6 @@ pub fn print_board() {
     }
 }
 
-
 fn solve_quadratic(a: f32, b: f32, c: f32) -> f32 {
     let determinant: f32 = b * b - 4f32 * a * c;
     // Since we only care about collisions that happen between t=[0, 1)
@@ -42,14 +41,19 @@ fn solve_quadratic(a: f32, b: f32, c: f32) -> f32 {
     }
 }
 
-fn find_collision_times(start1: Vector, v1: Vector, start2: Vector, v2: Vector, radius: f32) -> f32 {
+fn find_collision_times(
+    start1: Vector,
+    v1: Vector,
+    start2: Vector,
+    v2: Vector,
+    radius: f32,
+) -> f32 {
     let a: f32 = pow2(v1.x - v2.x) + pow2(v1.y - v2.y);
 
     let b: f32 = -2f32 * (v1.x - v2.x) * (start2.x - start1.x)
         - 2f32 * (v1.y - v2.y) * (start2.y - start1.y);
 
-    let c: f32 = pow2(start1.x - start2.x) +
-        pow2(start1.y - start2.y) - pow2(radius);
+    let c: f32 = pow2(start1.x - start2.x) + pow2(start1.y - start2.y) - pow2(radius);
 
     if abs(a) < f32::EPSILON {
         return -c / b;
@@ -66,7 +70,6 @@ pub struct Vector {
     pub(crate) y: f32,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct MovingObject {
     velocity: Vector,
@@ -80,23 +83,22 @@ impl MovingObject {
     pub fn new(starting_location: Vector, starting_velocity: Vector, symbol: char) -> MovingObject {
         let location = starting_location;
         let sum = abs(starting_velocity.x) + abs(starting_velocity.y);
-        if sum != 0f32 {
-            let temp = Vector { x: abs(starting_velocity.x) / sum, y: abs(starting_velocity.y) / sum };
-            MovingObject {
-                velocity: starting_velocity,
-                location,
-                symbol,
-                ratios: temp,
-                age: 0,
-            }
-        } else {
-            MovingObject {
-                velocity: starting_velocity,
-                location,
-                symbol,
-                ratios: Vector { x: 0.5f32 / sum, y: 0.5f32 },
-                age: 0,
-            }
+        MovingObject {
+            velocity: starting_velocity,
+            location,
+            symbol,
+            ratios: if sum != 0f32 {
+                Vector {
+                    x: abs(starting_velocity.x) / sum,
+                    y: abs(starting_velocity.y) / sum,
+                }
+            } else {
+                Vector {
+                    x: 0.5f32,
+                    y: 0.5f32,
+                }
+            },
+            age: 0,
         }
     }
 
@@ -132,10 +134,12 @@ impl MovingObject {
         }
     }
 
-    fn get_collisions(&self,
-                      others: &[Option<MovingObject>; MAXIMUM_OBJECTS],
-                      offset: usize,
-                      max_duration: f32, ) -> [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] {
+    fn get_collisions(
+        &self,
+        others: &[Option<MovingObject>; MAXIMUM_OBJECTS],
+        offset: usize,
+        max_duration: f32,
+    ) -> [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] {
         let new_loc = Vector {
             x: self.location.x + self.velocity.x,
             y: self.location.y + self.velocity.y,
@@ -143,57 +147,77 @@ impl MovingObject {
         // println!("{} {}", self.velocity.x, self.velocity.y);
 
         let mut num_collisions: usize = 0;
-        let mut collisions: [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] = [None; MAX_COLLISIONS_PER_OBJECT];
+        let mut collisions: [Option<(usize, f32, usize)>; MAX_COLLISIONS_PER_OBJECT] =
+            [None; MAX_COLLISIONS_PER_OBJECT];
 
         if new_loc.x < 0f32 && abs(self.location.x / self.velocity.x) < max_duration {
-            collisions[num_collisions] = Some((127, abs(self.location.x / self.velocity.x), offset));
+            collisions[num_collisions] =
+                Some((127, abs(self.location.x / self.velocity.x), offset));
             num_collisions += 1;
         }
-        if new_loc.x > BOARD_INSIDE as f32 &&
-            abs((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x) < max_duration {
-            collisions[num_collisions] = Some((126, abs((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x), offset));
+        if new_loc.x > BOARD_INSIDE as f32
+            && abs((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x) < max_duration
+        {
+            collisions[num_collisions] = Some((
+                126,
+                abs((BOARD_INSIDE as f32 - self.location.x) / self.velocity.x),
+                offset,
+            ));
             num_collisions += 1;
         }
         if new_loc.y < 0f32 && abs(self.location.y / self.velocity.y) < max_duration {
-            collisions[num_collisions] = Some((125, abs(self.location.y / self.velocity.y), offset));
+            collisions[num_collisions] =
+                Some((125, abs(self.location.y / self.velocity.y), offset));
             num_collisions += 1;
         }
-        if new_loc.y > BOARD_INSIDE as f32 &&
-            abs((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y) < max_duration {
-            collisions[num_collisions] = Some((124, abs((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y), offset));
+        if new_loc.y > BOARD_INSIDE as f32
+            && abs((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y) < max_duration
+        {
+            collisions[num_collisions] = Some((
+                124,
+                abs((BOARD_INSIDE as f32 - self.location.y) / self.velocity.y),
+                offset,
+            ));
             num_collisions += 1;
         }
 
         for i in offset + 1..MAXIMUM_OBJECTS {
             let other = match &others[i] {
                 Some(o) => o,
-                None => continue
+                None => continue,
             };
             if !self.moving() && !other.moving() {
                 continue;
             }
             let collision_time = find_collision_times(
-                self.location, self.velocity, other.location, other.velocity, 1f32,
+                self.location,
+                self.velocity,
+                other.location,
+                other.velocity,
+                1f32,
             );
             if 0f32 < collision_time && collision_time < max_duration {
                 collisions[num_collisions] = Some((i, collision_time, offset));
                 num_collisions += 1;
             }
         }
-        return collisions;
+        collisions
     }
 
     pub fn position(&self) -> (usize, usize) {
-        ((self.location.x + 1.5) as usize, (self.location.y + 1.5) as usize)
+        (
+            (self.location.x + 1.5) as usize,
+            (self.location.y + 1.5) as usize,
+        )
     }
 
     pub fn moving(&self) -> bool {
         return self.velocity.x != 0f32 || self.velocity.y != 0f32;
     }
-    pub fn clear_symbol(&mut self)  {
+    pub fn clear_symbol(&mut self) {
         self.symbol = '.';
     }
-    pub fn add_age(&mut self)  {
+    pub fn add_age(&mut self) {
         self.age = self.age + 1;
     }
     pub fn get_age(&self) -> usize {
@@ -205,7 +229,8 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
     let mut tick_so_far = 0f32;
     while tick_so_far < 1f32 {
         let mut collision_velocities: [Option<Vector>; MAXIMUM_OBJECTS] = [None; MAXIMUM_OBJECTS];
-        let mut all_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] = [None; MAXIMUM_COLLISIONS];
+        let mut all_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] =
+            [None; MAXIMUM_COLLISIONS];
         let mut total_collisions: usize = 0;
         for i in 0..number_of_objects {
             let ob = match &objects[i] {
@@ -216,7 +241,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
             for i in 0..MAX_COLLISIONS_PER_OBJECT {
                 match temp[i] {
                     Some(_) => (),
-                    None => break
+                    None => break,
                 };
                 all_collisions[total_collisions] = temp[i];
                 total_collisions += 1;
@@ -225,7 +250,8 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
         let mut duration = 1f32 - tick_so_far;
 
         let mut num_used_collisions = 0;
-        let mut used_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] = [None; MAXIMUM_COLLISIONS];
+        let mut used_collisions: [Option<(usize, f32, usize)>; MAXIMUM_COLLISIONS] =
+            [None; MAXIMUM_COLLISIONS];
 
         if total_collisions != 0 {
             let mut first_collision = 1f32;
@@ -233,7 +259,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
             for collision in &all_collisions {
                 let time = match collision {
                     Some(t) => t.1,
-                    None => break
+                    None => break,
                 };
                 first_collision = min(first_collision, time);
             }
@@ -244,7 +270,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
             for collision in &all_collisions {
                 let time = match collision {
                     Some(t) => t.1,
-                    None => break
+                    None => break,
                 };
                 if time <= first_collision {
                     used_collisions[num_used_collisions] = *collision;
@@ -259,7 +285,7 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
             };
             let mut first_collider = match objects[first_idx].clone() {
                 Some(o) => o,
-                None => panic!()
+                None => panic!(),
             };
 
             if other_idx == 126 || other_idx == 127 {
@@ -275,17 +301,18 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
             } else {
                 let other_collider = &mut match objects[other_idx].clone() {
                     Some(o) => o,
-                    None => panic!()
+                    None => panic!(),
                 };
                 if other_collider.moving() && first_collider.moving() {
                     let temp = first_collider.ratios;
                     first_collider.ratios = other_collider.ratios;
                     other_collider.ratios = temp;
 
-                    let total_velocity = (
-                        fast_sqrt(pow2(first_collider.velocity.x) + pow2(first_collider.velocity.y)) +
-                            fast_sqrt(pow2(other_collider.velocity.x) + pow2(other_collider.velocity.y))
-                    ) / 2f32;
+                    let total_velocity = (fast_sqrt(
+                        pow2(first_collider.velocity.x) + pow2(first_collider.velocity.y),
+                    ) + fast_sqrt(
+                        pow2(other_collider.velocity.x) + pow2(other_collider.velocity.y),
+                    )) / 2f32;
 
                     collision_velocities[other_idx] = Some(Vector {
                         x: total_velocity * other_collider.ratios.x * (if first_collider.velocity.x < 0f32 { -1f32 } else { 1f32 }),
@@ -312,12 +339,13 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
         for i in 0..number_of_objects {
             let temp = &mut match objects[i].clone() {
                 Some(o) => o,
-                None => continue
+                None => continue,
             };
-            temp.tick(duration,
-                      !(tick_so_far + duration < 1f32),
-                      collision_velocities[i]);
-
+            temp.tick(
+                duration,
+                !(tick_so_far + duration < 1f32),
+                collision_velocities[i],
+            );
         }
 
         if num_used_collisions != 0 {
@@ -328,15 +356,17 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
                 };
                 let object = match &objects[first_idx] {
                     Some(o) => o,
-                    None => panic!()
+                    None => panic!(),
                 };
                 if other_idx == 127 {
                     unsafe {
-                        BOARD[0 + (object.location.y + 1.5f32) as usize * BOARD_WIDTH] = object.symbol;
+                        BOARD[0 + (object.location.y + 1.5f32) as usize * BOARD_WIDTH] =
+                            object.symbol;
                     }
                 } else if other_idx == 126 {
                     unsafe {
-                        BOARD[BOARD_WIDTH - 1 + (object.location.y + 1.5f32) as usize * BOARD_WIDTH] = object.symbol;
+                        BOARD[BOARD_WIDTH - 1
+                            + (object.location.y + 1.5f32) as usize * BOARD_WIDTH] = object.symbol;
                     }
                 } else if other_idx == 125 {
                     unsafe {
@@ -344,7 +374,8 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
                     }
                 } else if other_idx == 124 {
                     unsafe {
-                        BOARD[(object.location.x + 1.5f32) as usize + (BOARD_WIDTH - 1) * BOARD_WIDTH] = object.symbol;
+                        BOARD[(object.location.x + 1.5f32) as usize
+                            + (BOARD_WIDTH - 1) * BOARD_WIDTH] = object.symbol;
                     }
                 }
             }
@@ -352,7 +383,6 @@ pub fn game_tick(objects: &mut [Option<MovingObject>; 10], number_of_objects: us
         tick_so_far += duration;
     }
 }
-
 
 #[repr(C)]
 union MyUnion {
