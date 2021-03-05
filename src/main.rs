@@ -89,16 +89,10 @@ fn read_remote_joy(rx: &mut gd32vf103xx_hal::serial::Rx<gd32vf103xx_hal::pac::US
     let mut full_input_received = false;
     let mut input = nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0};
     let mut bytes = 0;
-    loop {
-        let read_byte = nb::block!(rx.read());
-        let byte = match read_byte {
-            Ok(o) => Some(o),
-            Err(e) => None,
-        };
 
-        if byte.is_none() {
-            break;
-        }
+    while let Ok(o) = nb::block!(rx.read())
+    {
+        let byte = Some(o);
         bytes = bytes +1;
         //tx.write(byte.unwrap());
         
