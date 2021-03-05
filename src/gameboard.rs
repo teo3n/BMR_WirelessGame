@@ -1,9 +1,13 @@
 use crate::ws2812::{ Ws2812, RGB };
 use embedded_hal::digital::v2::OutputPin;
 
+pub const OUT_OF_RANGE_ERROR: &str = "Coords out of range";
+
 pub const WIDTH: usize = 16;
 pub const HEIGHT: usize = 16;
 pub const PIXEL_COUNT: usize = WIDTH * HEIGHT;
+
+pub struct OutOfBoundsError(&'static str);
 
 pub struct Gameboard<'a, T>
 {
@@ -27,24 +31,25 @@ where T: OutputPin
 
     // swaps colors between s_z, s_y and d_x, d_y if possible
     pub fn swap(&mut self, s_x : usize, s_y : usize, d_x : usize, d_y : usize)
+                -> Result<(), OutOfBoundsError>
     {
         let g_board_width = self.matrix.len();
         let g_board_height = self.matrix[0].len();
         if s_x >= g_board_width || d_x >= g_board_width || 
             s_y >= g_board_height || d_y >= g_board_height
         {
-            //Err("Coords out of range")
+            Err(OutOfBoundsError(OUT_OF_RANGE_ERROR))
         }
         else if s_x == d_x && s_y == d_y
         {
-            //Ok(true)
+            Ok(())
         }
         else
         {
             let temp_color = self.matrix[s_x][s_y];
             self.set_color(s_x,s_y,self.matrix[d_x][d_y]);
             self.set_color(d_x,d_y,temp_color);
-            //Ok(true)
+            Ok(())
         }
     }
 
