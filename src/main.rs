@@ -42,7 +42,7 @@ pub mod gameboard;
 pub mod colors;
 
 pub mod game;
-use gameboard::Gameboard;
+use gameboard::GameBoard;
 use ws2812::{ Ws2812, RGB };
 
 
@@ -253,7 +253,7 @@ fn main() -> ! {
 
     let mut wspin = gpiob.pb5.into_push_pull_output();
     let mut ws2 = Ws2812::<_, PIXEL_TOTAL_AMOUNT>::new(clock_speed, &mut wspin);
-    let mut board = gameboard::Gameboard::<_>::new(&mut ws2);
+    let mut board = gameboard::GameBoard::<_>::new(&mut ws2);
 
     // Add borders
     for x in 0..X_LIMIT
