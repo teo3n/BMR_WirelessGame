@@ -65,7 +65,7 @@ const PROJECTILE_NONE: char = '.';
 const PROJECTILE_P1: char = '*';
 const PROJECTILE_P2: char = '#';
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct Player {
     x: f32,
     y: f32,
@@ -76,6 +76,32 @@ struct Player {
     target_y:usize,
     use_target: bool,
     input: nunchuk::ControllerInput,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Player {
+            x: f32::default(),
+            y: f32::default(),
+            color: colors::PURPLE,
+            shoot_timeout: 4,
+            shoot_btn: false,
+            target_x: 0,
+            target_y: 0,
+            use_target: false,
+            // this could also be defaulted
+            input: nunchuk::ControllerInput{
+                joy_x:0,
+                joy_y:0,
+                btn_z:0,
+                btn_c:0,
+                accel_x:0,
+                accel_y:0,
+                accel_z:0
+            }
+        }
+        
+    }
 }
 
 // Read UART for input containing the remote player joystick etc data
@@ -226,19 +252,10 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let mut nchuck = nunchuk::Nunchuk::new(&mut afio, &mut rcu, i2c0, scl, sda);
 
-    let temp_player = Player { x: 7.0f32, y:1.0f32, 
-        color:colors::PURPLE,
-        shoot_timeout: 4,
-        shoot_btn: false,
-        target_x: 0,
-        target_y: 0,
-        use_target: false,
-        input: nunchuk::ControllerInput{joy_x:0,joy_y:0,btn_z:0,btn_c:0,accel_x:0,accel_y:0,accel_z:0},
-    };
-    let mut players = [temp_player, temp_player];
-    players[1].y = 14.0f32;
-    players[1].x = 8.0f32;
-    players[1].color = colors::OLIVE;
+    let player_1 = Player { x: 7.0f32, y:1.0f32, color:colors::PURPLE, ..Default::default()};
+    let player_2 = Player { x: 8.0f32, y:14.0f32, color:colors::OLIVE, ..player_1};
+
+    let mut players = [player_1, player_2];
 
     let mut objects: [Option<game::MovingObject>; game::MAXIMUM_OBJECTS] = [None; game::MAXIMUM_OBJECTS];
     let mut number_of_objects: usize = 0;
