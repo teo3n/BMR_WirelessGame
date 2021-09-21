@@ -1,5 +1,9 @@
 # BearMetalRust WirelessGame
 
+This project was made as a part of Tampere University's course, Bare Metal Rust, where Rust code was cross-compiled to some bare metal platform. This is a wireless multiplayer game, where the networking is handled by a separate ESP8266 module. 
+
+</br>
+
 how to run the project, tested on pop-os 20.04: 
 1. install dfu-util from source ```git clone git://git.code.sf.net/p/dfu-util/dfu-util``` and follow the instructions
 2. connect the longang nano and put it into boot mode (press and hold boot0 -button, click reset -button once)
